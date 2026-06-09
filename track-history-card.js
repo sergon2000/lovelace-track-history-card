@@ -795,7 +795,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
             <span>${this._t('title_lbl')}</span>
           </label>
           <input type="text" id="f-title" class="text-input"
-            placeholder="${this._t('title_lbl')}" value="${titleValue}"
+            placeholder="${this._t('default_title')}" value="${titleValue}"
             style="display:${hasTitle ? 'block' : 'none'}">
         </div>
 
