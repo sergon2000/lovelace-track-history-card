@@ -524,19 +524,26 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   _popupHtml(point, label = '') {
-    const fmt  = t => t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const time = point.count > 1
-      ? `${fmt(point.time)} – ${fmt(point.timeTo)}`
-      : fmt(point.time);
-    const acc  = (!point.count || point.count === 1) && point.accuracy
+    const fmt = t => t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    let timeHtml;
+    if (point.visits && point.visits.length > 1) {
+      timeHtml = point.visits
+        .map(v => `🕐 ${fmt(v.time)} – ${fmt(v.timeTo)}`)
+        .join('<br>');
+    } else if (point.count > 1) {
+      timeHtml = `🕐 ${fmt(point.time)} – ${fmt(point.timeTo)}`;
+    } else {
+      timeHtml = `🕐 ${fmt(point.time)}`;
+    }
+    const acc = (!point.count || point.count === 1) && point.accuracy
       ? `<div style="color:#999;font-size:11px">±${Math.round(point.accuracy)} m</div>` : '';
-    const cnt  = point.count > 1
+    const cnt = point.count > 1
       ? `<div style="color:#999;font-size:11px">${point.count} ${this._t('points')}</div>` : '';
-    const st   = point.state ? `<div style="color:#999;font-size:11px">${point.state}</div>` : '';
+    const st  = point.state ? `<div style="color:#999;font-size:11px">${point.state}</div>` : '';
     return `
       <div style="min-width:120px">
         ${label ? `<strong>${label}</strong><br>` : ''}
-        <span>🕐 ${time}</span>
+        ${timeHtml}
         ${cnt}${acc}${st}
       </div>`;
   }
@@ -562,39 +569,77 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   _clusterPoints(points, radiusMeters) {
     if (!radiusMeters || points.length === 0) return points.map(p => ({ ...p, count: 1 }));
 
-    const groups = [];
-    let group    = [points[0]];
-    let centroid = { lat: points[0].lat, lng: points[0].lng };
+    // Spatial single-linkage clustering (BFS): groups ALL nearby points
+    // regardless of their position in the track sequence.
+    const clId = new Array(points.length).fill(-1);
+    let nextId = 0;
+    for (let i = 0; i < points.length; i++) {
+      if (clId[i] !== -1) continue;
+      clId[i] = nextId;
+      const q = [i];
+      while (q.length) {
+        const cur = q.shift();
+        for (let j = 0; j < points.length; j++) {
+          if (clId[j] === -1 && this._haversine(points[cur], points[j]) * 1000 <= radiusMeters) {
+            clId[j] = nextId;
+            q.push(j);
+          }
+        }
+      }
+      nextId++;
+    }
 
-    for (let i = 1; i < points.length; i++) {
-      const dist = this._haversine(centroid, points[i]) * 1000; // km → m
-      if (dist <= radiusMeters) {
-        group.push(points[i]);
-        centroid = {
-          lat: group.reduce((s, p) => s + p.lat, 0) / group.length,
-          lng: group.reduce((s, p) => s + p.lng, 0) / group.length,
-        };
+    // Compute centroid and time range for each cluster
+    const clusters = {};
+    points.forEach((p, i) => {
+      const id = clId[i];
+      if (!clusters[id]) clusters[id] = { pts: [], lat: 0, lng: 0 };
+      clusters[id].pts.push(p);
+    });
+    for (const cl of Object.values(clusters)) {
+      cl.lat = cl.pts.reduce((s, p) => s + p.lat, 0) / cl.pts.length;
+      cl.lng = cl.pts.reduce((s, p) => s + p.lng, 0) / cl.pts.length;
+    }
+
+    // Compute per-cluster visits: consecutive runs in the original track sequence.
+    for (const [id, cl] of Object.entries(clusters)) {
+      cl.visits = [];
+      let run = null;
+      for (let i = 0; i < points.length; i++) {
+        if (clId[i] === Number(id)) {
+          if (!run) run = { time: points[i].time, timeTo: points[i].time };
+          else run.timeTo = points[i].time;
+        } else if (run) {
+          cl.visits.push(run);
+          run = null;
+        }
+      }
+      if (run) cl.visits.push(run);
+    }
+
+    // Walk original sequence, deduplicate consecutive same-cluster entries
+    // so the polyline still reflects the actual route.
+    const result = [];
+    let prevId = -1;
+    for (let i = 0; i < points.length; i++) {
+      const id = clId[i];
+      if (id === prevId) continue;
+      prevId = id;
+      const cl = clusters[id];
+      if (cl.pts.length === 1) {
+        result.push({ ...points[i], count: 1 });
       } else {
-        groups.push(group);
-        group    = [points[i]];
-        centroid = { lat: points[i].lat, lng: points[i].lng };
+        result.push({
+          lat: cl.lat, lng: cl.lng,
+          time:   cl.visits[0].time,
+          timeTo: cl.visits[cl.visits.length - 1].timeTo,
+          visits: cl.visits,
+          count:  cl.pts.length, accuracy: 0,
+          state:  cl.pts[0].state,
+        });
       }
     }
-    groups.push(group);
-
-    return groups.map(g => {
-      if (g.length === 1) return { ...g[0], count: 1 };
-      const lat = g.reduce((s, p) => s + p.lat, 0) / g.length;
-      const lng = g.reduce((s, p) => s + p.lng, 0) / g.length;
-      return {
-        lat, lng,
-        time:   g[0].time,
-        timeTo: g[g.length - 1].time,
-        count:  g.length,
-        accuracy: 0,
-        state: g[0].state,
-      };
-    });
+    return result;
   }
 
   _destroyMap() {
