@@ -8,7 +8,7 @@ A custom Lovelace card for [Home Assistant](https://www.home-assistant.io/) that
 <p align="center">
   <img src="card.png" width="50%">
   <br>
-  <sub>datapoints have been intentionally removed from this screenshot</sub>
+  <sub>Datapoints have been intentionally removed from this screenshot</sub>
 </p>
 
 ---
