@@ -40,6 +40,7 @@ const TRANSLATIONS = {
     remove:            'Remove',
     clustering_lbl:    'Cluster nearby points',
     cluster_radius_lbl:'Cluster radius (m)',
+    default_title:     'Track History',
   },
   es: {
     device:         'Dispositivo',
@@ -61,6 +62,7 @@ const TRANSLATIONS = {
     remove:            'Eliminar',
     clustering_lbl:    'Agrupar puntos cercanos',
     cluster_radius_lbl:'Radio de agrupación (m)',
+    default_title:     'Track History',
   },
   fr: {
     device:         'Appareil',
@@ -82,6 +84,7 @@ const TRANSLATIONS = {
     remove:            'Supprimer',
     clustering_lbl:    'Regrouper les points proches',
     cluster_radius_lbl:'Rayon de regroupement (m)',
+    default_title:     'Track History',
   },
   de: {
     device:         'Gerät',
@@ -103,6 +106,7 @@ const TRANSLATIONS = {
     remove:            'Entfernen',
     clustering_lbl:    'Nahegelegene Punkte gruppieren',
     cluster_radius_lbl:'Gruppierungsradius (m)',
+    default_title:     'Track History',
   },
   it: {
     device:         'Dispositivo',
@@ -124,6 +128,7 @@ const TRANSLATIONS = {
     remove:            'Rimuovi',
     clustering_lbl:    'Raggruppa punti vicini',
     cluster_radius_lbl:'Raggio di raggruppamento (m)',
+    default_title:     'Track History',
   },
   pt: {
     device:         'Dispositivo',
@@ -145,6 +150,7 @@ const TRANSLATIONS = {
     remove:            'Remover',
     clustering_lbl:    'Agrupar pontos próximos',
     cluster_radius_lbl:'Raio de agrupamento (m)',
+    default_title:     'Track History',
   },
 };
 
@@ -747,6 +753,29 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           accent-color: var(--primary-color, #03a9f4);
           flex-shrink: 0;
         }
+        .text-input {
+          display: block;
+          width: 100%;
+          margin-top: 10px;
+          padding: 8px 10px;
+          border: 1px solid var(--divider-color, #e0e0e0);
+          border-radius: 6px;
+          background: var(--card-background-color, #fff);
+          color: var(--primary-text-color, #333);
+          font-size: 14px;
+          box-sizing: border-box;
+          font-family: inherit;
+        }
+        .text-input:focus { outline: 2px solid var(--primary-color, #03a9f4); }
+        .check-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .check-row .text-input {
+          flex: 1;
+          margin-top: 0;
+        }
         select {
           width: 100%;
           padding: 8px 10px;
@@ -760,15 +789,14 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         }
       </style>
       <div class="editor">
-        <div>
+        <div class="check-row">
           <label class="check-label">
             <input type="checkbox" id="title-check" ${hasTitle ? 'checked' : ''}>
             <span>${this._t('title_lbl')}</span>
           </label>
-          ${hasTitle ? `
-            <ha-textfield id="f-title" label="${this._t('title_lbl')}"
-              value="${titleValue}" style="margin-top:10px;width:100%"></ha-textfield>
-          ` : ''}
+          <input type="text" id="f-title" class="text-input"
+            placeholder="${this._t('default_title')}" value="${titleValue}"
+            style="display:${hasTitle ? 'block' : 'none'}">
         </div>
 
         <div>
@@ -795,16 +823,14 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         <ha-textfield id="f-height" label="${this._t('map_height_lbl')}" type="number"
           value="${map_height}" min="200" max="1000"></ha-textfield>
 
-        <div>
+        <div class="check-row">
           <label class="check-label">
             <input type="checkbox" id="cluster-check" ${hasClustering ? 'checked' : ''}>
             <span>${this._t('clustering_lbl')}</span>
           </label>
-          ${hasClustering ? `
-            <ha-textfield id="f-cluster-radius" label="${this._t('cluster_radius_lbl')}"
-              type="number" value="${clusterRadius}" min="10" max="10000"
-              style="margin-top:10px;width:100%"></ha-textfield>
-          ` : ''}
+          <input type="number" id="f-cluster-radius" class="text-input"
+            placeholder="${this._t('cluster_radius_lbl')}" value="${clusterRadius}"
+            min="1" max="10000" style="display:${hasClustering ? 'block' : 'none'}">
         </div>
       </div>
     `;
@@ -814,14 +840,18 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     this.shadowRoot.getElementById('title-check')
       .addEventListener('change', e => {
         this._showTitle = e.target.checked;
-        if (!e.target.checked) this._set('title', null);
-        else this._render();
+        const field = this.shadowRoot.getElementById('f-title');
+        field.style.display = e.target.checked ? 'block' : 'none';
+        if (e.target.checked) {
+          field.value = field.value || this._t('default_title');
+          this._set('title', field.value);
+        } else {
+          this._set('title', null);
+        }
       });
 
-    if (hasTitle) {
-      this.shadowRoot.getElementById('f-title')
-        .addEventListener('change', e => this._set('title', e.target.value.trim()));
-    }
+    this.shadowRoot.getElementById('f-title')
+      .addEventListener('change', e => this._set('title', e.target.value.trim()));
 
     this.shadowRoot.getElementById('add-entity')
       .addEventListener('click', () => this._set('entities', [...(this._config.entities || []), '']));
@@ -839,17 +869,17 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     this.shadowRoot.getElementById('cluster-check')
       .addEventListener('change', e => {
         this._showClustering = e.target.checked;
+        const field = this.shadowRoot.getElementById('f-cluster-radius');
+        field.style.display = e.target.checked ? 'block' : 'none';
         if (!e.target.checked) this._set('cluster_radius', null);
-        else this._render();
+        else if (!this._config.cluster_radius) this._set('cluster_radius', 50);
       });
 
-    if (hasClustering) {
-      this.shadowRoot.getElementById('f-cluster-radius')
-        .addEventListener('change', e => {
-          const v = parseInt(e.target.value, 10);
-          this._set('cluster_radius', (!isNaN(v) && v >= 1) ? v : 50);
-        });
-    }
+    this.shadowRoot.getElementById('f-cluster-radius')
+      .addEventListener('change', e => {
+        const v = parseInt(e.target.value, 10);
+        this._set('cluster_radius', (!isNaN(v) && v >= 1) ? v : 50);
+      });
 
     this.shadowRoot.getElementById('f-height')
       .addEventListener('change', e => {
