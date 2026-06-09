@@ -260,13 +260,16 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const start = `${date}T00:00:00`;
     const end   = `${date}T23:59:59`;
 
+    // NOTE: HA evaluates `minimal_response` and `no_attributes` by *presence*,
+    // not value — passing `=false` still activates them and strips attributes.
+    // `significant_changes_only=0` is required to get every GPS update, not
+    // just zone-transition state changes.
     const result = await this._hass.callApi(
       'GET',
-      `history/period/${encodeURIComponent(start)}` +
+      `history/period/${start}` +
         `?filter_entity_id=${encodeURIComponent(entityId)}` +
         `&end_time=${encodeURIComponent(end)}` +
-        `&minimal_response=false` +
-        `&no_attributes=false`
+        `&significant_changes_only=0`
     );
 
     return (result?.[0] ?? [])
@@ -286,7 +289,15 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     this._destroyMap();
 
     const mapEl = this.shadowRoot.getElementById('map');
-    this._map = L.map(mapEl, { zoomControl: true });
+    // Animations disabled: Leaflet's animation internals read `_leaflet_pos`
+    // from map pane elements, which are not accessible across Shadow DOM
+    // boundaries, causing a TypeError during fitBounds/pan animations.
+    this._map = L.map(mapEl, {
+      zoomControl: true,
+      fadeAnimation: false,
+      zoomAnimation: false,
+      markerZoomAnimation: false,
+    });
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
@@ -316,7 +327,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       this._pinMarker(L, points[points.length - 1], '#C62828', 'E', 'End').addTo(this._map);
     }
 
-    this._map.fitBounds(L.latLngBounds(latlngs), { padding: [32, 32] });
+    this._map.fitBounds(L.latLngBounds(latlngs), { padding: [32, 32], animate: false });
   }
 
   _pinMarker(L, point, color, letter, label) {
@@ -354,7 +365,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
   _destroyMap() {
     if (this._map) {
-      this._map.remove();
+      try { this._map.stop(); this._map.remove(); } catch (_) { /* ignore Shadow DOM cleanup errors */ }
       this._map = null;
     }
   }
