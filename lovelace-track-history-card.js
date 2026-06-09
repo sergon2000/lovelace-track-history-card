@@ -178,7 +178,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { entities: [], title: 'Movement History', map_height: 400 };
+    return { entities: [], map_height: 400 };
   }
 
   setConfig(config) {
@@ -682,7 +682,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     this._buildEntityPickers(entities);
 
     this.shadowRoot.getElementById('f-title')
-      .addEventListener('change', e => this._set('title', e.target.value));
+      .addEventListener('change', e => this._set('title', e.target.value.trim() || null));
 
     this.shadowRoot.getElementById('add-entity')
       .addEventListener('click', () => this._set('entities', [...(this._config.entities || []), '']));
@@ -734,7 +734,13 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
   }
 
   _set(key, value) {
-    this._config = { ...this._config, [key]: value };
+    const config = { ...this._config };
+    if (value === null || value === undefined) {
+      delete config[key];
+    } else {
+      config[key] = value;
+    }
+    this._config = config;
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: this._config } }));
     this._render();
   }
