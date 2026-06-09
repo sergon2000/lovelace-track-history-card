@@ -9,6 +9,7 @@
  *   entities:
  *     - device_tracker.john_phone
  *     - device_tracker.jane_iphone
+ *   default_entity: device_tracker.john_phone
  *   map_height: 450
  */
 
@@ -53,6 +54,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     this._config = {
       title: 'Movement History',
       map_height: 400,
+      default_entity: null,
       ...config,
     };
     this._build();
@@ -83,7 +85,8 @@ class LovelaceTrackHistoryCard extends HTMLElement {
               <select id="entity-select">
                 ${this._config.entities.map(e => {
                   const label = e.replace('device_tracker.', '').replace(/_/g, ' ');
-                  return `<option value="${e}">${label}</option>`;
+                  const selected = e === this._config.default_entity ? ' selected' : '';
+                  return `<option value="${e}"${selected}>${label}</option>`;
                 }).join('')}
               </select>
             </div>
