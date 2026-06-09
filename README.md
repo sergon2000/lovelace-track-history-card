@@ -5,6 +5,12 @@ A custom Lovelace card for [Home Assistant](https://www.home-assistant.io/) that
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2023.0%2B-blue)
 ![HACS](https://img.shields.io/badge/HACS-Custom%20Repository-orange)
 
+<p align="center">
+  <img src="card.png" width="50%">
+  <br>
+  <sub>Datapoints have been intentionally removed from this screenshot</sub>
+</p>
+
 ---
 
 ## Features
