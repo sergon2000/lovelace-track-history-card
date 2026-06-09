@@ -42,6 +42,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     this._config = null;
     this._hass = null;
     this._leafletCssInjected = false;
+    this._autoLoaded = false;
   }
 
   // ── HA lifecycle ──────────────────────────────────────────────────────────
@@ -60,6 +61,10 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    if (!this._autoLoaded && this._config) {
+      this._autoLoaded = true;
+      this._onLoad();
+    }
   }
 
   disconnectedCallback() {
