@@ -611,8 +611,10 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
 
   _render() {
     const { entities = [], default_entity = '', map_height = 400 } = this._config;
-    const hasTitle  = 'title' in this._config;
-    const titleValue = this._config.title || '';
+    const hasTitle      = 'title' in this._config;
+    const titleValue    = this._config.title || '';
+    const hasDefault    = !!this._config.default_entity;
+    const defaultValue  = this._config.default_entity || '';
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -691,14 +693,18 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         </div>
 
         <div>
-          <div class="section-label">${this._t('default_dev')}</div>
-          <select id="f-default">
-            <option value="">${this._t('first_in_list')}</option>
-            ${entities.map(e => `
-              <option value="${e}" ${e === default_entity ? 'selected' : ''}>
-                ${e.replace('device_tracker.', '').replace(/_/g, ' ')}
-              </option>`).join('')}
-          </select>
+          <label class="check-label">
+            <input type="checkbox" id="default-check" ${hasDefault ? 'checked' : ''}>
+            <span>${this._t('default_dev')}</span>
+          </label>
+          ${hasDefault ? `
+            <select id="f-default" style="margin-top:10px">
+              ${entities.map(e => `
+                <option value="${e}" ${e === defaultValue ? 'selected' : ''}>
+                  ${e.replace('device_tracker.', '').replace(/_/g, ' ')}
+                </option>`).join('')}
+            </select>
+          ` : ''}
         </div>
 
         <ha-textfield id="f-height" label="${this._t('map_height_lbl')}" type="number"
@@ -719,8 +725,15 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     this.shadowRoot.getElementById('add-entity')
       .addEventListener('click', () => this._set('entities', [...(this._config.entities || []), '']));
 
-    this.shadowRoot.getElementById('f-default')
-      .addEventListener('change', e => this._set('default_entity', e.target.value || null));
+    this.shadowRoot.getElementById('default-check')
+      .addEventListener('change', e => {
+        this._set('default_entity', e.target.checked ? (entities[0] || '') : null);
+      });
+
+    if (hasDefault) {
+      this.shadowRoot.getElementById('f-default')
+        .addEventListener('change', e => this._set('default_entity', e.target.value || null));
+    }
 
     this.shadowRoot.getElementById('f-height')
       .addEventListener('change', e => {
