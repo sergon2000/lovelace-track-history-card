@@ -5,6 +5,8 @@ A custom Lovelace card for [Home Assistant](https://www.home-assistant.io/) that
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2023.0%2B-blue)
 ![HACS](https://img.shields.io/badge/HACS-Custom%20Repository-orange)
 
+![screenshot](screenshot.png)
+
 ---
 
 ## Features
