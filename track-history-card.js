@@ -36,8 +36,10 @@ const TRANSLATIONS = {
     add_device:     '+ Add device',
     default_dev:    'Default device',
     first_in_list:  '— first in list —',
-    map_height_lbl: 'Map height (px)',
-    remove:         'Remove',
+    map_height_lbl:    'Map height (px)',
+    remove:            'Remove',
+    clustering_lbl:    'Cluster nearby points',
+    cluster_radius_lbl:'Cluster radius (m)',
   },
   es: {
     device:         'Dispositivo',
@@ -55,8 +57,10 @@ const TRANSLATIONS = {
     add_device:     '+ Añadir dispositivo',
     default_dev:    'Dispositivo por defecto',
     first_in_list:  '— primero de la lista —',
-    map_height_lbl: 'Altura del mapa (px)',
-    remove:         'Eliminar',
+    map_height_lbl:    'Altura del mapa (px)',
+    remove:            'Eliminar',
+    clustering_lbl:    'Agrupar puntos cercanos',
+    cluster_radius_lbl:'Radio de agrupación (m)',
   },
   fr: {
     device:         'Appareil',
@@ -74,8 +78,10 @@ const TRANSLATIONS = {
     add_device:     '+ Ajouter un appareil',
     default_dev:    'Appareil par défaut',
     first_in_list:  '— premier de la liste —',
-    map_height_lbl: 'Hauteur de la carte (px)',
-    remove:         'Supprimer',
+    map_height_lbl:    'Hauteur de la carte (px)',
+    remove:            'Supprimer',
+    clustering_lbl:    'Regrouper les points proches',
+    cluster_radius_lbl:'Rayon de regroupement (m)',
   },
   de: {
     device:         'Gerät',
@@ -93,8 +99,10 @@ const TRANSLATIONS = {
     add_device:     '+ Gerät hinzufügen',
     default_dev:    'Standardgerät',
     first_in_list:  '— erstes in der Liste —',
-    map_height_lbl: 'Kartenhöhe (px)',
-    remove:         'Entfernen',
+    map_height_lbl:    'Kartenhöhe (px)',
+    remove:            'Entfernen',
+    clustering_lbl:    'Nahegelegene Punkte gruppieren',
+    cluster_radius_lbl:'Gruppierungsradius (m)',
   },
   it: {
     device:         'Dispositivo',
@@ -112,8 +120,10 @@ const TRANSLATIONS = {
     add_device:     '+ Aggiungi dispositivo',
     default_dev:    'Dispositivo predefinito',
     first_in_list:  '— primo della lista —',
-    map_height_lbl: 'Altezza mappa (px)',
-    remove:         'Rimuovi',
+    map_height_lbl:    'Altezza mappa (px)',
+    remove:            'Rimuovi',
+    clustering_lbl:    'Raggruppa punti vicini',
+    cluster_radius_lbl:'Raggio di raggruppamento (m)',
   },
   pt: {
     device:         'Dispositivo',
@@ -131,8 +141,10 @@ const TRANSLATIONS = {
     add_device:     '+ Adicionar dispositivo',
     default_dev:    'Dispositivo padrão',
     first_in_list:  '— primeiro da lista —',
-    map_height_lbl: 'Altura do mapa (px)',
-    remove:         'Remover',
+    map_height_lbl:    'Altura do mapa (px)',
+    remove:            'Remover',
+    clustering_lbl:    'Agrupar pontos próximos',
+    cluster_radius_lbl:'Raio de agrupamento (m)',
   },
 };
 
@@ -453,27 +465,32 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       maxZoom: 19,
     }).addTo(this._map);
 
-    const latlngs = points.map(p => [p.lat, p.lng]);
+    const displayed = this._clusterPoints(points, this._config.cluster_radius);
+    const latlngs   = displayed.map(p => [p.lat, p.lng]);
 
     // Main track polyline
     L.polyline(latlngs, { color: '#1565C0', weight: 3, opacity: 0.85 }).addTo(this._map);
 
-    // Intermediate waypoints
-    if (points.length > 2) {
-      points.slice(1, -1).forEach(p => {
-        L.circleMarker([p.lat, p.lng], {
-          radius: 4, color: '#1565C0', weight: 2,
-          fillColor: '#fff', fillOpacity: 1,
-        }).bindPopup(this._popupHtml(p)).addTo(this._map);
+    // Intermediate waypoints / clusters
+    if (displayed.length > 2) {
+      displayed.slice(1, -1).forEach(p => {
+        if (p.count > 1) {
+          this._clusterMarker(L, p).addTo(this._map);
+        } else {
+          L.circleMarker([p.lat, p.lng], {
+            radius: 4, color: '#1565C0', weight: 2,
+            fillColor: '#fff', fillOpacity: 1,
+          }).bindPopup(this._popupHtml(p)).addTo(this._map);
+        }
       });
     }
 
     // Start marker (green)
-    this._pinMarker(L, points[0], '#2E7D32', 'S', this._t('start')).addTo(this._map);
+    this._pinMarker(L, displayed[0], '#2E7D32', 'S', this._t('start')).addTo(this._map);
 
     // End marker (red) — only if more than one point
-    if (points.length > 1) {
-      this._pinMarker(L, points[points.length - 1], '#C62828', 'E', this._t('end')).addTo(this._map);
+    if (displayed.length > 1) {
+      this._pinMarker(L, displayed[displayed.length - 1], '#C62828', 'E', this._t('end')).addTo(this._map);
     }
 
     this._map.fitBounds(L.latLngBounds(latlngs), { padding: [32, 32], animate: false });
@@ -501,15 +518,77 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   _popupHtml(point, label = '') {
-    const time = point.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const acc  = point.accuracy ? `<div style="color:#999;font-size:11px">±${Math.round(point.accuracy)} m</div>` : '';
-    const st   = point.state    ? `<div style="color:#999;font-size:11px">${point.state}</div>` : '';
+    const fmt  = t => t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const time = point.count > 1
+      ? `${fmt(point.time)} – ${fmt(point.timeTo)}`
+      : fmt(point.time);
+    const acc  = (!point.count || point.count === 1) && point.accuracy
+      ? `<div style="color:#999;font-size:11px">±${Math.round(point.accuracy)} m</div>` : '';
+    const cnt  = point.count > 1
+      ? `<div style="color:#999;font-size:11px">${point.count} ${this._t('points')}</div>` : '';
+    const st   = point.state ? `<div style="color:#999;font-size:11px">${point.state}</div>` : '';
     return `
-      <div style="min-width:110px">
+      <div style="min-width:120px">
         ${label ? `<strong>${label}</strong><br>` : ''}
         <span>🕐 ${time}</span>
-        ${acc}${st}
+        ${cnt}${acc}${st}
       </div>`;
+  }
+
+  _clusterMarker(L, point) {
+    const icon = L.divIcon({
+      html: `<div style="
+        background:#F57C00;color:#fff;
+        width:28px;height:28px;border-radius:50%;
+        display:flex;align-items:center;justify-content:center;
+        font-size:11px;font-weight:700;
+        border:2px solid rgba(255,255,255,.9);
+        box-shadow:0 2px 6px rgba(0,0,0,.3);
+      ">${point.count}</div>`,
+      className: '',
+      iconSize: [28, 28],
+      iconAnchor: [14, 14],
+      popupAnchor: [0, -16],
+    });
+    return L.marker([point.lat, point.lng], { icon }).bindPopup(this._popupHtml(point));
+  }
+
+  _clusterPoints(points, radiusMeters) {
+    if (!radiusMeters || points.length === 0) return points.map(p => ({ ...p, count: 1 }));
+
+    const groups = [];
+    let group    = [points[0]];
+    let centroid = { lat: points[0].lat, lng: points[0].lng };
+
+    for (let i = 1; i < points.length; i++) {
+      const dist = this._haversine(centroid, points[i]) * 1000; // km → m
+      if (dist <= radiusMeters) {
+        group.push(points[i]);
+        centroid = {
+          lat: group.reduce((s, p) => s + p.lat, 0) / group.length,
+          lng: group.reduce((s, p) => s + p.lng, 0) / group.length,
+        };
+      } else {
+        groups.push(group);
+        group    = [points[i]];
+        centroid = { lat: points[i].lat, lng: points[i].lng };
+      }
+    }
+    groups.push(group);
+
+    return groups.map(g => {
+      if (g.length === 1) return { ...g[0], count: 1 };
+      const lat = g.reduce((s, p) => s + p.lat, 0) / g.length;
+      const lng = g.reduce((s, p) => s + p.lng, 0) / g.length;
+      return {
+        lat, lng,
+        time:   g[0].time,
+        timeTo: g[g.length - 1].time,
+        count:  g.length,
+        accuracy: 0,
+        state: g[0].state,
+      };
+    });
   }
 
   _destroyMap() {
@@ -615,6 +694,8 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     const titleValue    = this._config.title || '';
     const hasDefault    = !!this._config.default_entity;
     const defaultValue  = this._config.default_entity || '';
+    const hasClustering = 'cluster_radius' in this._config;
+    const clusterRadius = this._config.cluster_radius ?? 50;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -709,6 +790,18 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
 
         <ha-textfield id="f-height" label="${this._t('map_height_lbl')}" type="number"
           value="${map_height}" min="200" max="1000"></ha-textfield>
+
+        <div>
+          <label class="check-label">
+            <input type="checkbox" id="cluster-check" ${hasClustering ? 'checked' : ''}>
+            <span>${this._t('clustering_lbl')}</span>
+          </label>
+          ${hasClustering ? `
+            <ha-textfield id="f-cluster-radius" label="${this._t('cluster_radius_lbl')}"
+              type="number" value="${clusterRadius}" min="10" max="10000"
+              style="margin-top:10px;width:100%"></ha-textfield>
+          ` : ''}
+        </div>
       </div>
     `;
 
@@ -719,7 +812,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
 
     if (hasTitle) {
       this.shadowRoot.getElementById('f-title')
-        .addEventListener('change', e => this._set('title', e.target.value.trim() || null));
+        .addEventListener('change', e => this._set('title', e.target.value.trim()));
     }
 
     this.shadowRoot.getElementById('add-entity')
@@ -733,6 +826,17 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     if (hasDefault) {
       this.shadowRoot.getElementById('f-default')
         .addEventListener('change', e => this._set('default_entity', e.target.value || null));
+    }
+
+    this.shadowRoot.getElementById('cluster-check')
+      .addEventListener('change', e => this._set('cluster_radius', e.target.checked ? 50 : null));
+
+    if (hasClustering) {
+      this.shadowRoot.getElementById('f-cluster-radius')
+        .addEventListener('change', e => {
+          const v = parseInt(e.target.value, 10);
+          if (!isNaN(v) && v >= 1) this._set('cluster_radius', v);
+        });
     }
 
     this.shadowRoot.getElementById('f-height')
