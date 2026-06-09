@@ -1,4 +1,4 @@
-# lovelace-track-history-card
+# Track History Card
 
 A custom Lovelace card for [Home Assistant](https://www.home-assistant.io/) that displays the GPS movement history of any `device_tracker` entity on an interactive map for a selected day.
 
