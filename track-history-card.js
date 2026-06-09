@@ -827,7 +827,12 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         this._showTitle = e.target.checked;
         const field = this.shadowRoot.getElementById('f-title');
         field.style.display = e.target.checked ? 'block' : 'none';
-        if (!e.target.checked) this._set('title', null);
+        if (e.target.checked) {
+          field.value = field.value || this._t('title_lbl');
+          this._set('title', field.value);
+        } else {
+          this._set('title', null);
+        }
       });
 
     this.shadowRoot.getElementById('f-title')
