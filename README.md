@@ -50,7 +50,14 @@ A custom Lovelace card for [Home Assistant](https://www.home-assistant.io/) that
 
 ## Configuration
 
-Add the card to any dashboard using the **Manual card** editor:
+The card supports a **visual editor** — click the pencil icon after adding the card to configure it without writing YAML. Fields available:
+
+- **Title** — card header text
+- **Tracked devices** — add / remove `device_tracker` entities with an autocomplete picker
+- **Default device** — entity pre-selected on load (dropdown populated from the list above)
+- **Map height** — map height in pixels
+
+Alternatively, configure it manually via YAML:
 
 ```yaml
 type: custom:lovelace-track-history-card
