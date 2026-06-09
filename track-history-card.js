@@ -524,19 +524,26 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   _popupHtml(point, label = '') {
-    const fmt  = t => t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const time = point.count > 1
-      ? `${fmt(point.time)} – ${fmt(point.timeTo)}`
-      : fmt(point.time);
-    const acc  = (!point.count || point.count === 1) && point.accuracy
+    const fmt = t => t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    let timeHtml;
+    if (point.visits && point.visits.length > 1) {
+      timeHtml = point.visits
+        .map(v => `🕐 ${fmt(v.time)} – ${fmt(v.timeTo)}`)
+        .join('<br>');
+    } else if (point.count > 1) {
+      timeHtml = `🕐 ${fmt(point.time)} – ${fmt(point.timeTo)}`;
+    } else {
+      timeHtml = `🕐 ${fmt(point.time)}`;
+    }
+    const acc = (!point.count || point.count === 1) && point.accuracy
       ? `<div style="color:#999;font-size:11px">±${Math.round(point.accuracy)} m</div>` : '';
-    const cnt  = point.count > 1
+    const cnt = point.count > 1
       ? `<div style="color:#999;font-size:11px">${point.count} ${this._t('points')}</div>` : '';
-    const st   = point.state ? `<div style="color:#999;font-size:11px">${point.state}</div>` : '';
+    const st  = point.state ? `<div style="color:#999;font-size:11px">${point.state}</div>` : '';
     return `
       <div style="min-width:120px">
         ${label ? `<strong>${label}</strong><br>` : ''}
-        <span>🕐 ${time}</span>
+        ${timeHtml}
         ${cnt}${acc}${st}
       </div>`;
   }
@@ -594,6 +601,22 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       cl.lng = cl.pts.reduce((s, p) => s + p.lng, 0) / cl.pts.length;
     }
 
+    // Compute per-cluster visits: consecutive runs in the original track sequence.
+    for (const [id, cl] of Object.entries(clusters)) {
+      cl.visits = [];
+      let run = null;
+      for (let i = 0; i < points.length; i++) {
+        if (clId[i] === Number(id)) {
+          if (!run) run = { time: points[i].time, timeTo: points[i].time };
+          else run.timeTo = points[i].time;
+        } else if (run) {
+          cl.visits.push(run);
+          run = null;
+        }
+      }
+      if (run) cl.visits.push(run);
+    }
+
     // Walk original sequence, deduplicate consecutive same-cluster entries
     // so the polyline still reflects the actual route.
     const result = [];
@@ -606,12 +629,13 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       if (cl.pts.length === 1) {
         result.push({ ...points[i], count: 1 });
       } else {
-        const times = cl.pts.map(p => p.time).sort();
         result.push({
           lat: cl.lat, lng: cl.lng,
-          time: times[0], timeTo: times[times.length - 1],
-          count: cl.pts.length, accuracy: 0,
-          state: cl.pts[0].state,
+          time:   cl.visits[0].time,
+          timeTo: cl.visits[cl.visits.length - 1].timeTo,
+          visits: cl.visits,
+          count:  cl.pts.length, accuracy: 0,
+          state:  cl.pts[0].state,
         });
       }
     }
