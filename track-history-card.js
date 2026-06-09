@@ -666,10 +666,14 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     this.attachShadow({ mode: 'open' });
     this._config = {};
     this._hass = null;
+    this._showTitle = false;
+    this._showClustering = false;
   }
 
   setConfig(config) {
     this._config = { ...config };
+    this._showTitle = 'title' in config;
+    this._showClustering = 'cluster_radius' in config;
     this._render();
   }
 
@@ -690,11 +694,11 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
 
   _render() {
     const { entities = [], default_entity = '', map_height = 400 } = this._config;
-    const hasTitle      = 'title' in this._config;
+    const hasTitle      = this._showTitle;
     const titleValue    = this._config.title || '';
     const hasDefault    = !!this._config.default_entity;
     const defaultValue  = this._config.default_entity || '';
-    const hasClustering = 'cluster_radius' in this._config;
+    const hasClustering = this._showClustering;
     const clusterRadius = this._config.cluster_radius ?? 50;
 
     this.shadowRoot.innerHTML = `
@@ -808,7 +812,11 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     this._buildEntityPickers(entities);
 
     this.shadowRoot.getElementById('title-check')
-      .addEventListener('change', e => this._set('title', e.target.checked ? '' : null));
+      .addEventListener('change', e => {
+        this._showTitle = e.target.checked;
+        if (!e.target.checked) this._set('title', null);
+        else this._render();
+      });
 
     if (hasTitle) {
       this.shadowRoot.getElementById('f-title')
@@ -829,13 +837,17 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     }
 
     this.shadowRoot.getElementById('cluster-check')
-      .addEventListener('change', e => this._set('cluster_radius', e.target.checked ? 50 : null));
+      .addEventListener('change', e => {
+        this._showClustering = e.target.checked;
+        if (!e.target.checked) this._set('cluster_radius', null);
+        else this._render();
+      });
 
     if (hasClustering) {
       this.shadowRoot.getElementById('f-cluster-radius')
         .addEventListener('change', e => {
           const v = parseInt(e.target.value, 10);
-          if (!isNaN(v) && v >= 1) this._set('cluster_radius', v);
+          this._set('cluster_radius', (!isNaN(v) && v >= 1) ? v : 50);
         });
     }
 
