@@ -178,7 +178,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { entities: [], title: 'Movement History', map_height: 400 };
+    return { entities: [], map_height: 400 };
   }
 
   setConfig(config) {
@@ -610,7 +610,11 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
   }
 
   _render() {
-    const { entities = [], title = '', default_entity = '', map_height = 400 } = this._config;
+    const { entities = [], default_entity = '', map_height = 400 } = this._config;
+    const hasTitle      = 'title' in this._config;
+    const titleValue    = this._config.title || '';
+    const hasDefault    = !!this._config.default_entity;
+    const defaultValue  = this._config.default_entity || '';
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -642,6 +646,22 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           font-size: 13px;
         }
         .add-btn:hover { opacity: 0.8; }
+        .check-label {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          cursor: pointer;
+          font-size: 14px;
+          color: var(--primary-text-color, #333);
+          user-select: none;
+        }
+        .check-label input[type="checkbox"] {
+          width: 18px;
+          height: 18px;
+          cursor: pointer;
+          accent-color: var(--primary-color, #03a9f4);
+          flex-shrink: 0;
+        }
         select {
           width: 100%;
           padding: 8px 10px;
@@ -655,7 +675,16 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         }
       </style>
       <div class="editor">
-        <ha-textfield id="f-title" label="${this._t('title_lbl')}" value="${title}"></ha-textfield>
+        <div>
+          <label class="check-label">
+            <input type="checkbox" id="title-check" ${hasTitle ? 'checked' : ''}>
+            <span>${this._t('title_lbl')}</span>
+          </label>
+          ${hasTitle ? `
+            <ha-textfield id="f-title" label="${this._t('title_lbl')}"
+              value="${titleValue}" style="margin-top:10px;width:100%"></ha-textfield>
+          ` : ''}
+        </div>
 
         <div>
           <div class="section-label">${this._t('tracked_devs')}</div>
@@ -664,14 +693,18 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         </div>
 
         <div>
-          <div class="section-label">${this._t('default_dev')}</div>
-          <select id="f-default">
-            <option value="">${this._t('first_in_list')}</option>
-            ${entities.map(e => `
-              <option value="${e}" ${e === default_entity ? 'selected' : ''}>
-                ${e.replace('device_tracker.', '').replace(/_/g, ' ')}
-              </option>`).join('')}
-          </select>
+          <label class="check-label">
+            <input type="checkbox" id="default-check" ${hasDefault ? 'checked' : ''}>
+            <span>${this._t('default_dev')}</span>
+          </label>
+          ${hasDefault ? `
+            <select id="f-default" style="margin-top:10px">
+              ${entities.map(e => `
+                <option value="${e}" ${e === defaultValue ? 'selected' : ''}>
+                  ${e.replace('device_tracker.', '').replace(/_/g, ' ')}
+                </option>`).join('')}
+            </select>
+          ` : ''}
         </div>
 
         <ha-textfield id="f-height" label="${this._t('map_height_lbl')}" type="number"
@@ -681,14 +714,26 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
 
     this._buildEntityPickers(entities);
 
-    this.shadowRoot.getElementById('f-title')
-      .addEventListener('change', e => this._set('title', e.target.value));
+    this.shadowRoot.getElementById('title-check')
+      .addEventListener('change', e => this._set('title', e.target.checked ? '' : null));
+
+    if (hasTitle) {
+      this.shadowRoot.getElementById('f-title')
+        .addEventListener('change', e => this._set('title', e.target.value.trim() || null));
+    }
 
     this.shadowRoot.getElementById('add-entity')
       .addEventListener('click', () => this._set('entities', [...(this._config.entities || []), '']));
 
-    this.shadowRoot.getElementById('f-default')
-      .addEventListener('change', e => this._set('default_entity', e.target.value || null));
+    this.shadowRoot.getElementById('default-check')
+      .addEventListener('change', e => {
+        this._set('default_entity', e.target.checked ? (entities[0] || '') : null);
+      });
+
+    if (hasDefault) {
+      this.shadowRoot.getElementById('f-default')
+        .addEventListener('change', e => this._set('default_entity', e.target.value || null));
+    }
 
     this.shadowRoot.getElementById('f-height')
       .addEventListener('change', e => {
@@ -734,7 +779,13 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
   }
 
   _set(key, value) {
-    this._config = { ...this._config, [key]: value };
+    const config = { ...this._config };
+    if (value === null || value === undefined) {
+      delete config[key];
+    } else {
+      config[key] = value;
+    }
+    this._config = config;
     this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: this._config } }));
     this._render();
   }
