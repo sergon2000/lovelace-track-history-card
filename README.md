@@ -6,7 +6,7 @@ A custom Lovelace card for [Home Assistant](https://www.home-assistant.io/) that
 ![HACS](https://img.shields.io/badge/HACS-Custom%20Repository-orange)
 
 <p align="center">
-  <img src="card.png" width="50%">
+  <img src="https://raw.githubusercontent.com/sergon2000/lovelace-track-history-card/main/card.png" width="50%">
   <br>
   <sub>Datapoints have been intentionally removed from this screenshot</sub>
 </p>
