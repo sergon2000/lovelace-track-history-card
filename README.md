@@ -47,7 +47,7 @@ A custom Lovelace card for [Home Assistant](https://www.home-assistant.io/) that
 ### Manual
 
 1. Download `track-history-card.js` from the [latest release](https://github.com/sergon2000/lovelace-track-history-card/releases)
-2. Copy it to `/config/www/community/lovelace-track-history-card/track-history-card.js`
+2. Create the folder `/config/www/community/lovelace-track-history-card/` if it does not exist, then copy the file there
 3. In Home Assistant go to **Settings → Dashboards → Resources**
 4. Add `/local/community/lovelace-track-history-card/track-history-card.js` as type **JavaScript module**
 5. Reload your browser
