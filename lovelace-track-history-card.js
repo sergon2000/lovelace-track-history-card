@@ -610,7 +610,9 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
   }
 
   _render() {
-    const { entities = [], title = '', default_entity = '', map_height = 400 } = this._config;
+    const { entities = [], default_entity = '', map_height = 400 } = this._config;
+    const hasTitle  = 'title' in this._config;
+    const titleValue = this._config.title || '';
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -642,6 +644,22 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           font-size: 13px;
         }
         .add-btn:hover { opacity: 0.8; }
+        .check-label {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          cursor: pointer;
+          font-size: 14px;
+          color: var(--primary-text-color, #333);
+          user-select: none;
+        }
+        .check-label input[type="checkbox"] {
+          width: 18px;
+          height: 18px;
+          cursor: pointer;
+          accent-color: var(--primary-color, #03a9f4);
+          flex-shrink: 0;
+        }
         select {
           width: 100%;
           padding: 8px 10px;
@@ -655,7 +673,16 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         }
       </style>
       <div class="editor">
-        <ha-textfield id="f-title" label="${this._t('title_lbl')}" value="${title}"></ha-textfield>
+        <div>
+          <label class="check-label">
+            <input type="checkbox" id="title-check" ${hasTitle ? 'checked' : ''}>
+            <span>${this._t('title_lbl')}</span>
+          </label>
+          ${hasTitle ? `
+            <ha-textfield id="f-title" label="${this._t('title_lbl')}"
+              value="${titleValue}" style="margin-top:10px;width:100%"></ha-textfield>
+          ` : ''}
+        </div>
 
         <div>
           <div class="section-label">${this._t('tracked_devs')}</div>
@@ -681,8 +708,13 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
 
     this._buildEntityPickers(entities);
 
-    this.shadowRoot.getElementById('f-title')
-      .addEventListener('change', e => this._set('title', e.target.value.trim() || null));
+    this.shadowRoot.getElementById('title-check')
+      .addEventListener('change', e => this._set('title', e.target.checked ? '' : null));
+
+    if (hasTitle) {
+      this.shadowRoot.getElementById('f-title')
+        .addEventListener('change', e => this._set('title', e.target.value.trim() || null));
+    }
 
     this.shadowRoot.getElementById('add-entity')
       .addEventListener('click', () => this._set('entities', [...(this._config.entities || []), '']));
