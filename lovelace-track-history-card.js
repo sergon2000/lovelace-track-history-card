@@ -17,6 +17,131 @@ const LEAFLET_VERSION = '1.9.4';
 const LEAFLET_JS_URL = `https://unpkg.com/leaflet@${LEAFLET_VERSION}/dist/leaflet.js`;
 const LEAFLET_CSS_URL = `https://unpkg.com/leaflet@${LEAFLET_VERSION}/dist/leaflet.css`;
 
+// ── Translations ──────────────────────────────────────────────────────────────
+
+const TRANSLATIONS = {
+  en: {
+    device:         'Device',
+    date:           'Date',
+    load:           'Load',
+    loading:        'Loading…',
+    no_data:        'No location data found for this day.',
+    points:         'points',
+    error:          'Error',
+    start:          'Start',
+    end:            'End',
+    title_lbl:      'Title',
+    tracked_devs:   'Tracked devices',
+    device_n:       'Device',
+    add_device:     '+ Add device',
+    default_dev:    'Default device',
+    first_in_list:  '— first in list —',
+    map_height_lbl: 'Map height (px)',
+    remove:         'Remove',
+  },
+  es: {
+    device:         'Dispositivo',
+    date:           'Fecha',
+    load:           'Cargar',
+    loading:        'Cargando…',
+    no_data:        'No hay datos de ubicación para este día.',
+    points:         'puntos',
+    error:          'Error',
+    start:          'Inicio',
+    end:            'Fin',
+    title_lbl:      'Título',
+    tracked_devs:   'Dispositivos rastreados',
+    device_n:       'Dispositivo',
+    add_device:     '+ Añadir dispositivo',
+    default_dev:    'Dispositivo por defecto',
+    first_in_list:  '— primero de la lista —',
+    map_height_lbl: 'Altura del mapa (px)',
+    remove:         'Eliminar',
+  },
+  fr: {
+    device:         'Appareil',
+    date:           'Date',
+    load:           'Charger',
+    loading:        'Chargement…',
+    no_data:        'Aucune donnée de localisation pour ce jour.',
+    points:         'points',
+    error:          'Erreur',
+    start:          'Départ',
+    end:            'Arrivée',
+    title_lbl:      'Titre',
+    tracked_devs:   'Appareils suivis',
+    device_n:       'Appareil',
+    add_device:     '+ Ajouter un appareil',
+    default_dev:    'Appareil par défaut',
+    first_in_list:  '— premier de la liste —',
+    map_height_lbl: 'Hauteur de la carte (px)',
+    remove:         'Supprimer',
+  },
+  de: {
+    device:         'Gerät',
+    date:           'Datum',
+    load:           'Laden',
+    loading:        'Lädt…',
+    no_data:        'Keine Standortdaten für diesen Tag gefunden.',
+    points:         'Punkte',
+    error:          'Fehler',
+    start:          'Start',
+    end:            'Ende',
+    title_lbl:      'Titel',
+    tracked_devs:   'Verfolgte Geräte',
+    device_n:       'Gerät',
+    add_device:     '+ Gerät hinzufügen',
+    default_dev:    'Standardgerät',
+    first_in_list:  '— erstes in der Liste —',
+    map_height_lbl: 'Kartenhöhe (px)',
+    remove:         'Entfernen',
+  },
+  it: {
+    device:         'Dispositivo',
+    date:           'Data',
+    load:           'Carica',
+    loading:        'Caricamento…',
+    no_data:        'Nessun dato di posizione trovato per questo giorno.',
+    points:         'punti',
+    error:          'Errore',
+    start:          'Inizio',
+    end:            'Fine',
+    title_lbl:      'Titolo',
+    tracked_devs:   'Dispositivi tracciati',
+    device_n:       'Dispositivo',
+    add_device:     '+ Aggiungi dispositivo',
+    default_dev:    'Dispositivo predefinito',
+    first_in_list:  '— primo della lista —',
+    map_height_lbl: 'Altezza mappa (px)',
+    remove:         'Rimuovi',
+  },
+  pt: {
+    device:         'Dispositivo',
+    date:           'Data',
+    load:           'Carregar',
+    loading:        'A carregar…',
+    no_data:        'Sem dados de localização para este dia.',
+    points:         'pontos',
+    error:          'Erro',
+    start:          'Início',
+    end:            'Fim',
+    title_lbl:      'Título',
+    tracked_devs:   'Dispositivos rastreados',
+    device_n:       'Dispositivo',
+    add_device:     '+ Adicionar dispositivo',
+    default_dev:    'Dispositivo padrão',
+    first_in_list:  '— primeiro da lista —',
+    map_height_lbl: 'Altura do mapa (px)',
+    remove:         'Remover',
+  },
+};
+
+// HA language codes can be 'en', 'es', 'pt-BR', etc. — take the base code.
+function getLang(hass) {
+  const base = (hass?.language ?? 'en').split('-')[0].toLowerCase();
+  return TRANSLATIONS[base] ? base : 'en';
+}
+
 // Shared promise — only loads Leaflet once across all card instances
 let _leafletPromise = null;
 
@@ -61,7 +186,6 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       throw new Error('[lovelace-track-history-card] "entities" must be a non-empty list of device_tracker entity IDs.');
     }
     this._config = {
-      title: 'Movement History',
       map_height: 400,
       default_entity: null,
       ...config,
@@ -70,11 +194,20 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   set hass(hass) {
+    const langChanged = getLang(this._hass) !== getLang(hass);
     this._hass = hass;
+    if (langChanged && this._config) {
+      this._destroyMap();
+      this._build();
+    }
     if (!this._autoLoaded && this._config) {
       this._autoLoaded = true;
       this._onLoad();
     }
+  }
+
+  _t(key) {
+    return TRANSLATIONS[getLang(this._hass)][key];
   }
 
   disconnectedCallback() {
@@ -90,11 +223,11 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>${this._css(h)}</style>
       <ha-card>
-        <div class="card-header">${this._config.title}</div>
+        ${this._config.title ? `<div class="card-header">${this._config.title}</div>` : ''}
         <div class="card-content">
           <div class="controls">
             <div class="ctrl-group">
-              <label>Device</label>
+              <label>${this._t('device')}</label>
               <select id="entity-select">
                 ${this._config.entities.map(e => {
                   const label = e.replace('device_tracker.', '').replace(/_/g, ' ');
@@ -104,17 +237,17 @@ class LovelaceTrackHistoryCard extends HTMLElement {
               </select>
             </div>
             <div class="ctrl-group">
-              <label>Date</label>
+              <label>${this._t('date')}</label>
               <input type="date" id="date-picker" value="${today}" max="${today}" />
             </div>
             <button id="load-btn">
-              <span id="btn-label">Load</span>
+              <span id="btn-label">${this._t('load')}</span>
             </button>
           </div>
           <div id="alert" class="alert hidden"></div>
           <div id="map-wrap">
             <div id="map"></div>
-            <div id="no-data" class="no-data hidden">No location data found for this day.</div>
+            <div id="no-data" class="no-data hidden">${this._t('no_data')}</div>
           </div>
           <div id="summary" class="summary hidden"></div>
         </div>
@@ -245,7 +378,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const btn   = this.shadowRoot.getElementById('load-btn');
     const label = this.shadowRoot.getElementById('btn-label');
     btn.disabled = true;
-    label.textContent = 'Loading…';
+    label.textContent = this._t('loading');
     this._setAlert('');
     this._setSummary(null);
     this._setNoData(false);
@@ -265,10 +398,10 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       }
     } catch (err) {
       console.error('[lovelace-track-history-card]', err);
-      this._setAlert(`Error: ${err.message}`, 'error');
+      this._setAlert(`${this._t('error')}: ${err.message}`, 'error');
     } finally {
       btn.disabled = false;
-      label.textContent = 'Load';
+      label.textContent = this._t('load');
     }
   }
 
@@ -336,11 +469,11 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     }
 
     // Start marker (green)
-    this._pinMarker(L, points[0], '#2E7D32', 'S', 'Start').addTo(this._map);
+    this._pinMarker(L, points[0], '#2E7D32', 'S', this._t('start')).addTo(this._map);
 
     // End marker (red) — only if more than one point
     if (points.length > 1) {
-      this._pinMarker(L, points[points.length - 1], '#C62828', 'E', 'End').addTo(this._map);
+      this._pinMarker(L, points[points.length - 1], '#C62828', 'E', this._t('end')).addTo(this._map);
     }
 
     this._map.fitBounds(L.latLngBounds(latlngs), { padding: [32, 32], animate: false });
@@ -409,7 +542,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const km    = this._totalKm(points);
 
     el.innerHTML = `
-      <span class="summary-item">📍 ${points.length} points</span>
+      <span class="summary-item">📍 ${points.length} ${this._t('points')}</span>
       <span class="summary-item">🕐 ${first} – ${last}</span>
       <span class="summary-item">📏 ~${km} km</span>
     `;
@@ -462,9 +595,18 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
   }
 
   set hass(hass) {
+    const langChanged = getLang(this._hass) !== getLang(hass);
     this._hass = hass;
-    // Propagate hass to already-rendered entity pickers without full re-render
-    this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(p => { p.hass = hass; });
+    if (langChanged && this._config) {
+      this._render();
+    } else {
+      // Propagate hass to already-rendered entity pickers without full re-render
+      this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(p => { p.hass = hass; });
+    }
+  }
+
+  _t(key) {
+    return TRANSLATIONS[getLang(this._hass)][key];
   }
 
   _render() {
@@ -513,18 +655,18 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         }
       </style>
       <div class="editor">
-        <ha-textfield id="f-title" label="Title" value="${title}"></ha-textfield>
+        <ha-textfield id="f-title" label="${this._t('title_lbl')}" value="${title}"></ha-textfield>
 
         <div>
-          <div class="section-label">Tracked devices</div>
+          <div class="section-label">${this._t('tracked_devs')}</div>
           <div id="entities-list"></div>
-          <button class="add-btn" id="add-entity">+ Add device</button>
+          <button class="add-btn" id="add-entity">${this._t('add_device')}</button>
         </div>
 
         <div>
-          <div class="section-label">Default device</div>
+          <div class="section-label">${this._t('default_dev')}</div>
           <select id="f-default">
-            <option value="">— first in list —</option>
+            <option value="">${this._t('first_in_list')}</option>
             ${entities.map(e => `
               <option value="${e}" ${e === default_entity ? 'selected' : ''}>
                 ${e.replace('device_tracker.', '').replace(/_/g, ' ')}
@@ -532,7 +674,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           </select>
         </div>
 
-        <ha-textfield id="f-height" label="Map height (px)" type="number"
+        <ha-textfield id="f-height" label="${this._t('map_height_lbl')}" type="number"
           value="${map_height}" min="200" max="1000"></ha-textfield>
       </div>
     `;
@@ -564,7 +706,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
       const picker = document.createElement('ha-entity-picker');
       picker.hass = this._hass;
       picker.value = entity;
-      picker.setAttribute('label', `Device ${idx + 1}`);
+      picker.setAttribute('label', `${this._t('device_n')} ${idx + 1}`);
       picker.setAttribute('include-domains', '["device_tracker"]');
       picker.setAttribute('allow-custom-entity', '');
       picker.addEventListener('value-changed', e => {
@@ -578,7 +720,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
       });
 
       const removeBtn = document.createElement('ha-icon-button');
-      removeBtn.setAttribute('label', 'Remove');
+      removeBtn.setAttribute('label', this._t('remove'));
       removeBtn.innerHTML = `<ha-icon icon="mdi:delete-outline"></ha-icon>`;
       removeBtn.addEventListener('click', () => {
         const updated = (this._config.entities || []).filter((_, i) => i !== idx);
