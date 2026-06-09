@@ -48,6 +48,14 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
   // ── HA lifecycle ──────────────────────────────────────────────────────────
 
+  static getConfigElement() {
+    return document.createElement('lovelace-track-history-card-editor');
+  }
+
+  static getStubConfig() {
+    return { entities: [], title: 'Movement History', map_height: 400 };
+  }
+
   setConfig(config) {
     if (!config.entities || !Array.isArray(config.entities) || config.entities.length === 0) {
       throw new Error('[lovelace-track-history-card] "entities" must be a non-empty list of device_tracker entity IDs.');
@@ -437,6 +445,160 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
   }
 }
+
+// ── Visual config editor ──────────────────────────────────────────────────────
+
+class LovelaceTrackHistoryCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this._config = {};
+    this._hass = null;
+  }
+
+  setConfig(config) {
+    this._config = { ...config };
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    // Propagate hass to already-rendered entity pickers without full re-render
+    this.shadowRoot.querySelectorAll('ha-entity-picker').forEach(p => { p.hass = hass; });
+  }
+
+  _render() {
+    const { entities = [], title = '', default_entity = '', map_height = 400 } = this._config;
+
+    this.shadowRoot.innerHTML = `
+      <style>
+        .editor { display: flex; flex-direction: column; gap: 20px; padding: 4px 0; }
+        ha-textfield { width: 100%; }
+        .section-label {
+          font-size: 11px;
+          font-weight: 500;
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: var(--secondary-text-color, #888);
+          margin-bottom: 6px;
+        }
+        .entity-row {
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          margin-bottom: 8px;
+        }
+        .entity-row ha-entity-picker { flex: 1; }
+        .add-btn {
+          width: 100%;
+          padding: 8px;
+          background: none;
+          border: 1px dashed var(--divider-color, #ccc);
+          border-radius: 6px;
+          color: var(--primary-color, #03a9f4);
+          cursor: pointer;
+          font-size: 13px;
+        }
+        .add-btn:hover { opacity: 0.8; }
+        select {
+          width: 100%;
+          padding: 8px 10px;
+          border: 1px solid var(--divider-color, #e0e0e0);
+          border-radius: 6px;
+          background: var(--card-background-color, #fff);
+          color: var(--primary-text-color, #333);
+          font-size: 14px;
+          height: 40px;
+          box-sizing: border-box;
+        }
+      </style>
+      <div class="editor">
+        <ha-textfield id="f-title" label="Title" value="${title}"></ha-textfield>
+
+        <div>
+          <div class="section-label">Tracked devices</div>
+          <div id="entities-list"></div>
+          <button class="add-btn" id="add-entity">+ Add device</button>
+        </div>
+
+        <div>
+          <div class="section-label">Default device</div>
+          <select id="f-default">
+            <option value="">— first in list —</option>
+            ${entities.map(e => `
+              <option value="${e}" ${e === default_entity ? 'selected' : ''}>
+                ${e.replace('device_tracker.', '').replace(/_/g, ' ')}
+              </option>`).join('')}
+          </select>
+        </div>
+
+        <ha-textfield id="f-height" label="Map height (px)" type="number"
+          value="${map_height}" min="200" max="1000"></ha-textfield>
+      </div>
+    `;
+
+    this._buildEntityPickers(entities);
+
+    this.shadowRoot.getElementById('f-title')
+      .addEventListener('change', e => this._set('title', e.target.value));
+
+    this.shadowRoot.getElementById('add-entity')
+      .addEventListener('click', () => this._set('entities', [...(this._config.entities || []), '']));
+
+    this.shadowRoot.getElementById('f-default')
+      .addEventListener('change', e => this._set('default_entity', e.target.value || null));
+
+    this.shadowRoot.getElementById('f-height')
+      .addEventListener('change', e => {
+        const v = parseInt(e.target.value, 10);
+        if (!isNaN(v) && v >= 200) this._set('map_height', v);
+      });
+  }
+
+  _buildEntityPickers(entities) {
+    const container = this.shadowRoot.getElementById('entities-list');
+    entities.forEach((entity, idx) => {
+      const row = document.createElement('div');
+      row.className = 'entity-row';
+
+      const picker = document.createElement('ha-entity-picker');
+      picker.hass = this._hass;
+      picker.value = entity;
+      picker.setAttribute('label', `Device ${idx + 1}`);
+      picker.setAttribute('include-domains', '["device_tracker"]');
+      picker.setAttribute('allow-custom-entity', '');
+      picker.addEventListener('value-changed', e => {
+        const updated = [...(this._config.entities || [])];
+        if (e.detail.value) {
+          updated[idx] = e.detail.value;
+        } else {
+          updated.splice(idx, 1);
+        }
+        this._set('entities', updated);
+      });
+
+      const removeBtn = document.createElement('ha-icon-button');
+      removeBtn.setAttribute('label', 'Remove');
+      removeBtn.innerHTML = `<ha-icon icon="mdi:delete-outline"></ha-icon>`;
+      removeBtn.addEventListener('click', () => {
+        const updated = (this._config.entities || []).filter((_, i) => i !== idx);
+        this._set('entities', updated);
+      });
+
+      row.appendChild(picker);
+      row.appendChild(removeBtn);
+      container.appendChild(row);
+    });
+  }
+
+  _set(key, value) {
+    this._config = { ...this._config, [key]: value };
+    this.dispatchEvent(new CustomEvent('config-changed', { detail: { config: this._config } }));
+    this._render();
+  }
+}
+
+customElements.define('lovelace-track-history-card-editor', LovelaceTrackHistoryCardEditor);
 
 // ── Registration ──────────────────────────────────────────────────────────────
 
