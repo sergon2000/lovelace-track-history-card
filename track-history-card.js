@@ -476,6 +476,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
     // Main track polyline
     L.polyline(latlngs, { color: '#1565C0', weight: 3, opacity: 0.85 }).addTo(this._map);
+    this._addArrows(L, latlngs);
 
     // Intermediate waypoints / clusters
     if (displayed.length > 2) {
@@ -697,6 +698,36 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     let d = 0;
     for (let i = 1; i < points.length; i++) d += this._haversine(points[i - 1], points[i]);
     return d.toFixed(1);
+  }
+
+  _addArrows(L, latlngs) {
+    if (latlngs.length < 2) return;
+    const step = Math.max(1, Math.floor(latlngs.length / 15));
+    for (let i = step; i < latlngs.length; i += step) {
+      const [lat1, lng1] = latlngs[i - 1];
+      const [lat2, lng2] = latlngs[i];
+      const angle = this._bearing(lat1, lng1, lat2, lng2);
+      const mid   = [(lat1 + lat2) / 2, (lng1 + lng2) / 2];
+      L.marker(mid, {
+        icon: L.divIcon({
+          html: `<div style="transform:rotate(${angle}deg);font-size:14px;line-height:1;
+                   color:#1565C0;text-shadow:0 0 3px #fff,0 0 3px #fff;">▲</div>`,
+          className: '',
+          iconSize: [14, 14],
+          iconAnchor: [7, 7],
+        }),
+        interactive: false,
+      }).addTo(this._map);
+    }
+  }
+
+  _bearing(lat1, lng1, lat2, lng2) {
+    const r = Math.PI / 180;
+    const φ1 = lat1 * r, φ2 = lat2 * r;
+    const Δλ = (lng2 - lng1) * r;
+    const y = Math.sin(Δλ) * Math.cos(φ2);
+    const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+    return Math.atan2(y, x) / r;
   }
 
   _haversine(a, b) {
