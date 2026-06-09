@@ -694,8 +694,8 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     const titleValue    = this._config.title || '';
     const hasDefault    = !!this._config.default_entity;
     const defaultValue  = this._config.default_entity || '';
-    const hasClustering = !!this._config.cluster_radius;
-    const clusterRadius = this._config.cluster_radius || 50;
+    const hasClustering = 'cluster_radius' in this._config;
+    const clusterRadius = this._config.cluster_radius ?? 50;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -835,7 +835,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
       this.shadowRoot.getElementById('f-cluster-radius')
         .addEventListener('change', e => {
           const v = parseInt(e.target.value, 10);
-          if (!isNaN(v) && v >= 10) this._set('cluster_radius', v);
+          if (!isNaN(v) && v >= 1) this._set('cluster_radius', v);
         });
     }
 
