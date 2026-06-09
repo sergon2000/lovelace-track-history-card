@@ -21,7 +21,6 @@ const LEAFLET_CSS_URL = `https://unpkg.com/leaflet@${LEAFLET_VERSION}/dist/leafl
 
 const TRANSLATIONS = {
   en: {
-    card_title:     'Movement History',
     device:         'Device',
     date:           'Date',
     load:           'Load',
@@ -41,7 +40,6 @@ const TRANSLATIONS = {
     remove:         'Remove',
   },
   es: {
-    card_title:     'Historial de movimientos',
     device:         'Dispositivo',
     date:           'Fecha',
     load:           'Cargar',
@@ -61,7 +59,6 @@ const TRANSLATIONS = {
     remove:         'Eliminar',
   },
   fr: {
-    card_title:     'Historique des déplacements',
     device:         'Appareil',
     date:           'Date',
     load:           'Charger',
@@ -81,7 +78,6 @@ const TRANSLATIONS = {
     remove:         'Supprimer',
   },
   de: {
-    card_title:     'Bewegungsverlauf',
     device:         'Gerät',
     date:           'Datum',
     load:           'Laden',
@@ -101,7 +97,6 @@ const TRANSLATIONS = {
     remove:         'Entfernen',
   },
   it: {
-    card_title:     'Cronologia spostamenti',
     device:         'Dispositivo',
     date:           'Data',
     load:           'Carica',
@@ -121,7 +116,6 @@ const TRANSLATIONS = {
     remove:         'Rimuovi',
   },
   pt: {
-    card_title:     'Histórico de movimentos',
     device:         'Dispositivo',
     date:           'Data',
     load:           'Carregar',
@@ -229,7 +223,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>${this._css(h)}</style>
       <ha-card>
-        <div class="card-header">${this._config.title || this._t('card_title')}</div>
+        ${this._config.title ? `<div class="card-header">${this._config.title}</div>` : ''}
         <div class="card-content">
           <div class="controls">
             <div class="ctrl-group">
