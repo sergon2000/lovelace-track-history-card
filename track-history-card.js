@@ -812,7 +812,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
 
     if (hasTitle) {
       this.shadowRoot.getElementById('f-title')
-        .addEventListener('change', e => this._set('title', e.target.value.trim() || null));
+        .addEventListener('change', e => this._set('title', e.target.value.trim()));
     }
 
     this.shadowRoot.getElementById('add-entity')
