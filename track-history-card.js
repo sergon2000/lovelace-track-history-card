@@ -40,6 +40,7 @@ const TRANSLATIONS = {
     remove:            'Remove',
     clustering_lbl:    'Cluster nearby points',
     cluster_radius_lbl:'Cluster radius (m)',
+    default_title:     'Track History',
   },
   es: {
     device:         'Dispositivo',
@@ -61,6 +62,7 @@ const TRANSLATIONS = {
     remove:            'Eliminar',
     clustering_lbl:    'Agrupar puntos cercanos',
     cluster_radius_lbl:'Radio de agrupación (m)',
+    default_title:     'Track History',
   },
   fr: {
     device:         'Appareil',
@@ -82,6 +84,7 @@ const TRANSLATIONS = {
     remove:            'Supprimer',
     clustering_lbl:    'Regrouper les points proches',
     cluster_radius_lbl:'Rayon de regroupement (m)',
+    default_title:     'Track History',
   },
   de: {
     device:         'Gerät',
@@ -103,6 +106,7 @@ const TRANSLATIONS = {
     remove:            'Entfernen',
     clustering_lbl:    'Nahegelegene Punkte gruppieren',
     cluster_radius_lbl:'Gruppierungsradius (m)',
+    default_title:     'Track History',
   },
   it: {
     device:         'Dispositivo',
@@ -124,6 +128,7 @@ const TRANSLATIONS = {
     remove:            'Rimuovi',
     clustering_lbl:    'Raggruppa punti vicini',
     cluster_radius_lbl:'Raggio di raggruppamento (m)',
+    default_title:     'Track History',
   },
   pt: {
     device:         'Dispositivo',
@@ -145,6 +150,7 @@ const TRANSLATIONS = {
     remove:            'Remover',
     clustering_lbl:    'Agrupar pontos próximos',
     cluster_radius_lbl:'Raio de agrupamento (m)',
+    default_title:     'Track History',
   },
 };
 
@@ -837,7 +843,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         const field = this.shadowRoot.getElementById('f-title');
         field.style.display = e.target.checked ? 'block' : 'none';
         if (e.target.checked) {
-          field.value = field.value || this._t('title_lbl');
+          field.value = field.value || this._t('default_title');
           this._set('title', field.value);
         } else {
           this._set('title', null);
