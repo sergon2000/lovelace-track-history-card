@@ -562,39 +562,60 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   _clusterPoints(points, radiusMeters) {
     if (!radiusMeters || points.length === 0) return points.map(p => ({ ...p, count: 1 }));
 
-    const groups = [];
-    let group    = [points[0]];
-    let centroid = { lat: points[0].lat, lng: points[0].lng };
+    // Spatial single-linkage clustering (BFS): groups ALL nearby points
+    // regardless of their position in the track sequence.
+    const clId = new Array(points.length).fill(-1);
+    let nextId = 0;
+    for (let i = 0; i < points.length; i++) {
+      if (clId[i] !== -1) continue;
+      clId[i] = nextId;
+      const q = [i];
+      while (q.length) {
+        const cur = q.shift();
+        for (let j = 0; j < points.length; j++) {
+          if (clId[j] === -1 && this._haversine(points[cur], points[j]) * 1000 <= radiusMeters) {
+            clId[j] = nextId;
+            q.push(j);
+          }
+        }
+      }
+      nextId++;
+    }
 
-    for (let i = 1; i < points.length; i++) {
-      const dist = this._haversine(centroid, points[i]) * 1000; // km → m
-      if (dist <= radiusMeters) {
-        group.push(points[i]);
-        centroid = {
-          lat: group.reduce((s, p) => s + p.lat, 0) / group.length,
-          lng: group.reduce((s, p) => s + p.lng, 0) / group.length,
-        };
+    // Compute centroid and time range for each cluster
+    const clusters = {};
+    points.forEach((p, i) => {
+      const id = clId[i];
+      if (!clusters[id]) clusters[id] = { pts: [], lat: 0, lng: 0 };
+      clusters[id].pts.push(p);
+    });
+    for (const cl of Object.values(clusters)) {
+      cl.lat = cl.pts.reduce((s, p) => s + p.lat, 0) / cl.pts.length;
+      cl.lng = cl.pts.reduce((s, p) => s + p.lng, 0) / cl.pts.length;
+    }
+
+    // Walk original sequence, deduplicate consecutive same-cluster entries
+    // so the polyline still reflects the actual route.
+    const result = [];
+    let prevId = -1;
+    for (let i = 0; i < points.length; i++) {
+      const id = clId[i];
+      if (id === prevId) continue;
+      prevId = id;
+      const cl = clusters[id];
+      if (cl.pts.length === 1) {
+        result.push({ ...points[i], count: 1 });
       } else {
-        groups.push(group);
-        group    = [points[i]];
-        centroid = { lat: points[i].lat, lng: points[i].lng };
+        const times = cl.pts.map(p => p.time).sort();
+        result.push({
+          lat: cl.lat, lng: cl.lng,
+          time: times[0], timeTo: times[times.length - 1],
+          count: cl.pts.length, accuracy: 0,
+          state: cl.pts[0].state,
+        });
       }
     }
-    groups.push(group);
-
-    return groups.map(g => {
-      if (g.length === 1) return { ...g[0], count: 1 };
-      const lat = g.reduce((s, p) => s + p.lat, 0) / g.length;
-      const lng = g.reduce((s, p) => s + p.lng, 0) / g.length;
-      return {
-        lat, lng,
-        time:   g[0].time,
-        timeTo: g[g.length - 1].time,
-        count:  g.length,
-        accuracy: 0,
-        state: g[0].state,
-      };
-    });
+    return result;
   }
 
   _destroyMap() {
