@@ -761,6 +761,15 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           font-family: inherit;
         }
         .text-input:focus { outline: 2px solid var(--primary-color, #03a9f4); }
+        .check-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+        .check-row .text-input {
+          flex: 1;
+          margin-top: 0;
+        }
         select {
           width: 100%;
           padding: 8px 10px;
@@ -774,7 +783,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         }
       </style>
       <div class="editor">
-        <div>
+        <div class="check-row">
           <label class="check-label">
             <input type="checkbox" id="title-check" ${hasTitle ? 'checked' : ''}>
             <span>${this._t('title_lbl')}</span>
@@ -808,7 +817,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         <ha-textfield id="f-height" label="${this._t('map_height_lbl')}" type="number"
           value="${map_height}" min="200" max="1000"></ha-textfield>
 
-        <div>
+        <div class="check-row">
           <label class="check-label">
             <input type="checkbox" id="cluster-check" ${hasClustering ? 'checked' : ''}>
             <span>${this._t('clustering_lbl')}</span>
