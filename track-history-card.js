@@ -500,7 +500,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const latlngs   = displayed.map(p => [p.lat, p.lng]);
 
     // Main track polyline
-    L.polyline(latlngs, { color: '#1565C0', weight: 3, opacity: 0.85 }).addTo(this._map);
+    L.polyline(latlngs, { color: '#1565C0', weight: 5, opacity: 0.85 }).addTo(this._map);
     this._addArrows(L, latlngs);
 
     // Intermediate waypoints / clusters
@@ -735,11 +735,11 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       const mid   = [(lat1 + lat2) / 2, (lng1 + lng2) / 2];
       L.marker(mid, {
         icon: L.divIcon({
-          html: `<div style="transform:rotate(${angle}deg);font-size:18px;line-height:1;
+          html: `<div style="transform:rotate(${angle}deg);font-size:22px;line-height:1;
                    color:#1565C0;text-shadow:0 0 4px #fff,0 0 4px #fff;">▲</div>`,
           className: '',
-          iconSize: [18, 18],
-          iconAnchor: [9, 9],
+          iconSize: [22, 22],
+          iconAnchor: [11, 11],
         }),
         interactive: false,
       }).addTo(this._map);
