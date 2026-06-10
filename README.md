@@ -77,7 +77,7 @@ entities:
 default_entity: device_tracker.jane_iphone
 map_height: 450
 cluster_radius: 100
-min_points: 2
+min_points: 3
 ```
 
 ### Options
@@ -89,7 +89,7 @@ min_points: 2
 | `default_entity` | `string` | first entity | Entity pre-selected in the dropdown on load. Must be present in `entities`. If omitted or not found, the first entity is used. |
 | `map_height` | `number` | `400` | Map height in pixels |
 | `cluster_radius` | `number` | `100` | Radius in meters for grouping nearby points into stop clusters. Points outside any cluster are treated as in-transit and are not marked individually. |
-| `min_points` | `number` | `2` | Minimum number of consecutive points within the radius required to form a cluster. Runs shorter than this are treated as in-transit. |
+| `min_points` | `number` | `3` | Minimum number of consecutive points within the radius required to form a cluster. Runs shorter than this are treated as in-transit. |
 
 ---
 

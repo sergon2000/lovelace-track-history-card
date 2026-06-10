@@ -196,7 +196,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { entities: [], map_height: 400, cluster_radius: 100, min_points: 2 };
+    return { entities: [], map_height: 400, cluster_radius: 100, min_points: 3 };
   }
 
   setConfig(config) {
@@ -207,7 +207,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       map_height: 400,
       default_entity: null,
       cluster_radius: 100,
-      min_points: 2,
+      min_points: 3,
       ...config,
     };
     this._build();
@@ -587,9 +587,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return L.marker([point.lat, point.lng], { icon }).bindPopup(this._popupHtml(point));
   }
 
-  _clusterPoints(points, radiusMeters, minPoints = 2) {
+  _clusterPoints(points, radiusMeters, minPoints = 3) {
     if (!radiusMeters || points.length === 0) return points.map(p => ({ ...p, count: 1 }));
-    const minPts = Math.max(2, minPoints || 2);
+    const minPts = Math.max(2, minPoints || 3);
 
     // Sequential clustering: a cluster is a run of CONSECUTIVE points that
     // stay within radiusMeters of the running centroid. Leaving the radius
@@ -802,7 +802,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     const hasDefault    = !!this._config.default_entity;
     const defaultValue  = this._config.default_entity || '';
     const clusterRadius = this._config.cluster_radius ?? 100;
-    const minPoints     = this._config.min_points ?? 2;
+    const minPoints     = this._config.min_points ?? 3;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -977,7 +977,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     this.shadowRoot.getElementById('f-min-points')
       .addEventListener('change', e => {
         const v = parseInt(e.target.value, 10);
-        this._set('min_points', (!isNaN(v) && v >= 2) ? v : 2);
+        this._set('min_points', (!isNaN(v) && v >= 2) ? v : 3);
       });
 
     this.shadowRoot.getElementById('f-height')
