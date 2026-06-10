@@ -439,7 +439,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       fadeAnimation: false,
       zoomAnimation: false,
       markerZoomAnimation: false,
-      wheelPxPerZoomLevel: 120,
+      wheelPxPerZoomLevel: 250,
     });
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
