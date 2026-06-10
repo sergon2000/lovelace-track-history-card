@@ -249,7 +249,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
               <label>${this._t('device')}</label>
               <select id="entity-select">
                 ${this._config.entities.map(e => {
-                  const label = e.replace('device_tracker.', '').replace(/_/g, ' ');
+                  const label = e.replace('device_tracker.', '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                   const selected = e === this._config.default_entity ? ' selected' : '';
                   return `<option value="${e}"${selected}>${label}</option>`;
                 }).join('')}
@@ -914,7 +914,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
             <select id="f-default" style="margin-top:10px">
               ${entities.map(e => `
                 <option value="${e}" ${e === defaultValue ? 'selected' : ''}>
-                  ${e.replace('device_tracker.', '').replace(/_/g, ' ')}
+                  ${e.replace('device_tracker.', '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                 </option>`).join('')}
             </select>
           ` : ''}
