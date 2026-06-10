@@ -494,8 +494,12 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const displayed = this._clusterPoints(points, this._config.cluster_radius);
     const latlngs   = displayed.map(p => [p.lat, p.lng]);
 
-    // Main track polyline
-    L.polyline(latlngs, { color: '#1565C0', weight: 5, opacity: 0.85 }).addTo(this._map);
+    // Main track polyline — geometry smoothed with a Catmull-Rom spline so
+    // the path curves gently through the points instead of sharp corners.
+    L.polyline(this._smoothPath(latlngs), {
+      color: '#1565C0', weight: 5, opacity: 0.85,
+      lineJoin: 'round', lineCap: 'round',
+    }).addTo(this._map);
     this._addArrows(L, latlngs);
 
     // Cluster markers only. Single in-transit points are not marked — the
@@ -714,6 +718,31 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     let d = 0;
     for (let i = 1; i < points.length; i++) d += this._haversine(points[i - 1], points[i]);
     return d.toFixed(1);
+  }
+
+  _smoothPath(latlngs, steps = 12) {
+    if (latlngs.length < 3) return latlngs;
+    const pts = latlngs;
+    const out = [pts[0]];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1] || pts[i];
+      const p1 = pts[i];
+      const p2 = pts[i + 1];
+      const p3 = pts[i + 2] || p2;
+      for (let s = 1; s <= steps; s++) {
+        const t  = s / steps;
+        const t2 = t * t;
+        const t3 = t2 * t;
+        const lat = 0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t
+          + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2
+          + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3);
+        const lng = 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t
+          + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2
+          + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
+        out.push([lat, lng]);
+      }
+    }
+    return out;
   }
 
   _addArrows(L, latlngs) {
