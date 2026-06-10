@@ -17,9 +17,9 @@ A custom Lovelace card for [Home Assistant](https://www.home-assistant.io/) that
 
 - Select any `device_tracker` entity from a configurable list
 - Date picker to browse any past day
-- Renders a full movement path as a polyline on an [OpenStreetMap](https://www.openstreetmap.org/) map (via Leaflet)
+- Renders a full movement path as a directional polyline on an [OpenStreetMap](https://www.openstreetmap.org/) map (via Leaflet)
 - **Start** (green) and **End** (red) pin markers with popup details
-- Intermediate waypoints with timestamp, GPS accuracy and entity state on click
+- Nearby points are grouped into **stop clusters** (configurable radius) showing visit count and per-visit time ranges; in-transit points are not marked, so only the path line represents them
 - Summary bar with total points, time range, and approximate distance
 - Adapts to the Home Assistant theme (light / dark)
 
@@ -61,7 +61,10 @@ The card supports a **visual editor** — click the pencil icon after adding the
 - **Title** — card header text
 - **Tracked devices** — add / remove `device_tracker` entities with an autocomplete picker
 - **Default device** — entity pre-selected on load (dropdown populated from the list above)
+- **Theme** — map theme: System (follows Home Assistant), Light, or Dark
 - **Map height** — map height in pixels
+- **Cluster radius** — distance in meters within which nearby points are grouped into a single stop cluster
+- **Minimum points per cluster** — how many consecutive points within the radius are needed to form a cluster
 
 Alternatively, configure it manually via YAML:
 
@@ -73,7 +76,10 @@ entities:
   - device_tracker.jane_iphone
   - device_tracker.car_tracker
 default_entity: device_tracker.jane_iphone
+theme: system
 map_height: 450
+cluster_radius: 100
+min_points: 3
 ```
 
 ### Options
@@ -83,16 +89,19 @@ map_height: 450
 | `entities` | `list` | **required** | One or more `device_tracker` entity IDs to show in the device dropdown |
 | `title` | `string` | `Movement History` | Card title displayed in the header |
 | `default_entity` | `string` | first entity | Entity pre-selected in the dropdown on load. Must be present in `entities`. If omitted or not found, the first entity is used. |
+| `theme` | `string` | `system` | Map theme: `system` (follows the Home Assistant light/dark mode), `light`, or `dark`. |
 | `map_height` | `number` | `400` | Map height in pixels |
+| `cluster_radius` | `number` | `100` | Radius in meters for grouping nearby points into stop clusters. Points outside any cluster are treated as in-transit and are not marked individually. |
+| `min_points` | `number` | `3` | Minimum number of consecutive points within the radius required to form a cluster. Runs shorter than this are treated as in-transit. |
 
 ---
 
 ## Usage
 
-1. Select a **device** from the dropdown (lists all entities defined in `entities`)
-2. Pick a **date** using the date picker (today or any past day)
-3. Click **Load** — the card queries the HA History API and draws the path on the map
-4. Click any point on the map to see its timestamp, GPS accuracy and entity state
+1. Select a **device** from the dropdown (hidden when only one entity is configured)
+2. Pick a **date** with the date picker, or step day-by-day with the ‹ › arrows
+3. The map refreshes automatically — no Load button needed — querying the HA History API and drawing the path
+4. Click any **stop cluster** marker to see its visit count and per-visit time ranges
 5. The summary bar below the map shows the total number of recorded points, the time range, and the approximate distance travelled
 
 ---
