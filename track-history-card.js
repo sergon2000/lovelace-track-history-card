@@ -244,16 +244,18 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         ${this._config.title ? `<div class="card-header">${this._config.title}</div>` : ''}
         <div class="card-content">
           <div class="controls">
+            ${this._config.entities.length > 1 ? `
             <div class="ctrl-group">
               <label>${this._t('device')}</label>
               <select id="entity-select">
                 ${this._config.entities.map(e => {
-                  const label = e.replace('device_tracker.', '').replace(/_/g, ' ');
+                  const label = this._hass?.states[e]?.attributes?.friendly_name
+                    || e.replace('device_tracker.', '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                   const selected = e === this._config.default_entity ? ' selected' : '';
                   return `<option value="${e}"${selected}>${label}</option>`;
                 }).join('')}
               </select>
-            </div>
+            </div>` : `<input type="hidden" id="entity-select" value="${this._config.entities[0]}">`}
             <div class="ctrl-group">
               <label>${this._t('date')}</label>
               <div class="date-nav">
@@ -367,6 +369,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         width: 100%;
         box-sizing: border-box;
         height: 38px;
+        text-align: center;
       }
 /* Alert banner */
       .alert {
@@ -912,7 +915,8 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
             <select id="f-default" style="margin-top:10px">
               ${entities.map(e => `
                 <option value="${e}" ${e === defaultValue ? 'selected' : ''}>
-                  ${e.replace('device_tracker.', '').replace(/_/g, ' ')}
+                  ${this._hass?.states[e]?.attributes?.friendly_name
+                    || e.replace('device_tracker.', '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
                 </option>`).join('')}
             </select>
           ` : ''}
