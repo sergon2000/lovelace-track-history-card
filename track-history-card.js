@@ -917,7 +917,8 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           align-items: center;
           gap: 12px;
         }
-        .check-row .text-input {
+        .check-row .text-input,
+        .check-row select {
           flex: 1;
           margin-top: 0;
         }
@@ -985,13 +986,13 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
             style="display:${hasTitle ? 'block' : 'none'}">
         </div>
 
-        <div>
+        <div class="check-row">
           <label class="check-label">
             <input type="checkbox" id="default-check" ${hasDefault ? 'checked' : ''}>
             <span>${this._t('default_dev')}</span>
           </label>
           ${hasDefault ? `
-            <select id="f-default" style="margin-top:10px">
+            <select id="f-default">
               ${entities.map(e => `
                 <option value="${e}" ${e === defaultValue ? 'selected' : ''}>
                   ${this._hass?.states[e]?.attributes?.friendly_name
