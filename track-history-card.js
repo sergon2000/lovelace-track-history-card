@@ -244,6 +244,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         ${this._config.title ? `<div class="card-header">${this._config.title}</div>` : ''}
         <div class="card-content">
           <div class="controls">
+            ${this._config.entities.length > 1 ? `
             <div class="ctrl-group">
               <label>${this._t('device')}</label>
               <select id="entity-select">
@@ -253,7 +254,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
                   return `<option value="${e}"${selected}>${label}</option>`;
                 }).join('')}
               </select>
-            </div>
+            </div>` : `<input type="hidden" id="entity-select" value="${this._config.entities[0]}">`}
             <div class="ctrl-group">
               <label>${this._t('date')}</label>
               <div class="date-nav">
