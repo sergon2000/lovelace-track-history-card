@@ -38,7 +38,6 @@ const TRANSLATIONS = {
     first_in_list:  '— first in list —',
     map_height_lbl:    'Map height (px)',
     remove:            'Remove',
-    clustering_lbl:    'Cluster nearby points',
     cluster_radius_lbl:'Cluster radius (m)',
     default_title:     'Track History',
   },
@@ -60,7 +59,6 @@ const TRANSLATIONS = {
     first_in_list:  '— primero de la lista —',
     map_height_lbl:    'Altura del mapa (px)',
     remove:            'Eliminar',
-    clustering_lbl:    'Agrupar puntos cercanos',
     cluster_radius_lbl:'Radio de agrupación (m)',
     default_title:     'Track History',
   },
@@ -82,7 +80,6 @@ const TRANSLATIONS = {
     first_in_list:  '— premier de la liste —',
     map_height_lbl:    'Hauteur de la carte (px)',
     remove:            'Supprimer',
-    clustering_lbl:    'Regrouper les points proches',
     cluster_radius_lbl:'Rayon de regroupement (m)',
     default_title:     'Track History',
   },
@@ -104,7 +101,6 @@ const TRANSLATIONS = {
     first_in_list:  '— erstes in der Liste —',
     map_height_lbl:    'Kartenhöhe (px)',
     remove:            'Entfernen',
-    clustering_lbl:    'Nahegelegene Punkte gruppieren',
     cluster_radius_lbl:'Gruppierungsradius (m)',
     default_title:     'Track History',
   },
@@ -126,7 +122,6 @@ const TRANSLATIONS = {
     first_in_list:  '— primo della lista —',
     map_height_lbl:    'Altezza mappa (px)',
     remove:            'Rimuovi',
-    clustering_lbl:    'Raggruppa punti vicini',
     cluster_radius_lbl:'Raggio di raggruppamento (m)',
     default_title:     'Track History',
   },
@@ -148,7 +143,6 @@ const TRANSLATIONS = {
     first_in_list:  '— primeiro da lista —',
     map_height_lbl:    'Altura do mapa (px)',
     remove:            'Remover',
-    clustering_lbl:    'Agrupar pontos próximos',
     cluster_radius_lbl:'Raio de agrupamento (m)',
     default_title:     'Track History',
   },
@@ -196,7 +190,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { entities: [], map_height: 400 };
+    return { entities: [], map_height: 400, cluster_radius: 100 };
   }
 
   setConfig(config) {
@@ -206,6 +200,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     this._config = {
       map_height: 400,
       default_entity: null,
+      cluster_radius: 100,
       ...config,
     };
     this._build();
@@ -503,16 +498,12 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     L.polyline(latlngs, { color: '#1565C0', weight: 5, opacity: 0.85 }).addTo(this._map);
     this._addArrows(L, latlngs);
 
-    // Intermediate waypoints / clusters
+    // Cluster markers only. Single in-transit points are not marked — the
+    // device is just passing through, so the polyline alone represents them.
     if (displayed.length > 2) {
       displayed.slice(1, -1).forEach(p => {
         if (p.count > 1) {
           this._clusterMarker(L, p).addTo(this._map);
-        } else {
-          L.circleMarker([p.lat, p.lng], {
-            radius: 4, color: '#1565C0', weight: 2,
-            fillColor: '#fff', fillOpacity: 1,
-          }).bindPopup(this._popupHtml(p)).addTo(this._map);
         }
       });
     }
@@ -774,13 +765,11 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     this._config = {};
     this._hass = null;
     this._showTitle = false;
-    this._showClustering = false;
   }
 
   setConfig(config) {
     this._config = { ...config };
     this._showTitle = 'title' in config;
-    this._showClustering = 'cluster_radius' in config;
     this._render();
   }
 
@@ -805,7 +794,6 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     const titleValue    = this._config.title || '';
     const hasDefault    = !!this._config.default_entity;
     const defaultValue  = this._config.default_entity || '';
-    const hasClustering = this._showClustering;
     const clusterRadius = this._config.cluster_radius ?? 100;
 
     this.shadowRoot.innerHTML = `
@@ -925,15 +913,8 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         <ha-textfield id="f-height" label="${this._t('map_height_lbl')}" type="number"
           value="${map_height}" min="200" max="1000"></ha-textfield>
 
-        <div class="check-row">
-          <label class="check-label">
-            <input type="checkbox" id="cluster-check" ${hasClustering ? 'checked' : ''}>
-            <span>${this._t('clustering_lbl')}</span>
-          </label>
-          <input type="number" id="f-cluster-radius" class="text-input"
-            placeholder="${this._t('cluster_radius_lbl')}" value="${clusterRadius}"
-            min="1" max="10000" style="display:${hasClustering ? 'block' : 'none'}">
-        </div>
+        <ha-textfield id="f-cluster-radius" label="${this._t('cluster_radius_lbl')}" type="number"
+          value="${clusterRadius}" min="1" max="10000"></ha-textfield>
       </div>
     `;
 
@@ -968,19 +949,10 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         .addEventListener('change', e => this._set('default_entity', e.target.value || null));
     }
 
-    this.shadowRoot.getElementById('cluster-check')
-      .addEventListener('change', e => {
-        this._showClustering = e.target.checked;
-        const field = this.shadowRoot.getElementById('f-cluster-radius');
-        field.style.display = e.target.checked ? 'block' : 'none';
-        if (!e.target.checked) this._set('cluster_radius', null);
-        else if (!this._config.cluster_radius) this._set('cluster_radius', 100);
-      });
-
     this.shadowRoot.getElementById('f-cluster-radius')
       .addEventListener('change', e => {
         const v = parseInt(e.target.value, 10);
-        this._set('cluster_radius', (!isNaN(v) && v >= 1) ? v : 50);
+        this._set('cluster_radius', (!isNaN(v) && v >= 1) ? v : 100);
       });
 
     this.shadowRoot.getElementById('f-height')
