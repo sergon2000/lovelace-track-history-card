@@ -915,6 +915,27 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           flex: 1;
           margin-top: 0;
         }
+        .radio-group {
+          display: flex;
+          gap: 20px;
+          flex-wrap: wrap;
+        }
+        .radio-label {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          font-size: 14px;
+          color: var(--primary-text-color, #333);
+          user-select: none;
+        }
+        .radio-label input[type="radio"] {
+          width: 18px;
+          height: 18px;
+          cursor: pointer;
+          accent-color: var(--primary-color, #03a9f4);
+          flex-shrink: 0;
+        }
         select {
           width: 100%;
           padding: 8px 10px;
@@ -962,11 +983,13 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
 
         <div>
           <div class="section-label">${this._t('theme_lbl')}</div>
-          <select id="f-theme" style="margin-top:0">
-            <option value="system" ${themeValue === 'system' ? 'selected' : ''}>${this._t('theme_system')}</option>
-            <option value="light" ${themeValue === 'light' ? 'selected' : ''}>${this._t('theme_light')}</option>
-            <option value="dark" ${themeValue === 'dark' ? 'selected' : ''}>${this._t('theme_dark')}</option>
-          </select>
+          <div class="radio-group">
+            ${['system', 'light', 'dark'].map(v => `
+              <label class="radio-label">
+                <input type="radio" name="theme-radio" value="${v}" ${themeValue === v ? 'checked' : ''}>
+                <span>${this._t('theme_' + v)}</span>
+              </label>`).join('')}
+          </div>
         </div>
 
         <div>
@@ -1020,8 +1043,10 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         .addEventListener('change', e => this._set('default_entity', e.target.value || null));
     }
 
-    this.shadowRoot.getElementById('f-theme')
-      .addEventListener('change', e => this._set('theme', e.target.value));
+    this.shadowRoot.querySelectorAll('input[name="theme-radio"]')
+      .forEach(r => r.addEventListener('change', e => {
+        if (e.target.checked) this._set('theme', e.target.value);
+      }));
 
     this.shadowRoot.getElementById('f-cluster-radius')
       .addEventListener('change', e => {
