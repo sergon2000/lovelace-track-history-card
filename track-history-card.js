@@ -792,7 +792,6 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>
         .editor { display: flex; flex-direction: column; gap: 20px; padding: 4px 0; }
-        ha-textfield { width: 100%; }
         .section-label {
           font-size: 11px;
           font-weight: 500;
@@ -903,11 +902,17 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           ` : ''}
         </div>
 
-        <ha-textfield id="f-height" label="${this._t('map_height_lbl')}" type="number"
-          value="${map_height}" min="200" max="1000"></ha-textfield>
+        <div>
+          <div class="section-label">${this._t('map_height_lbl')}</div>
+          <input type="number" id="f-height" class="text-input" style="margin-top:0"
+            value="${map_height}" min="200" max="1000">
+        </div>
 
-        <ha-textfield id="f-cluster-radius" label="${this._t('cluster_radius_lbl')}" type="number"
-          value="${clusterRadius}" min="1" max="10000"></ha-textfield>
+        <div>
+          <div class="section-label">${this._t('cluster_radius_lbl')}</div>
+          <input type="number" id="f-cluster-radius" class="text-input" style="margin-top:0"
+            value="${clusterRadius}" min="1" max="10000">
+        </div>
       </div>
     `;
 
