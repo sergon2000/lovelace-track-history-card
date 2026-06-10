@@ -702,7 +702,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
   _addArrows(L, latlngs) {
     if (latlngs.length < 2) return;
-    const step = Math.max(1, Math.floor(latlngs.length / 15));
+    const step = Math.max(1, Math.floor(latlngs.length / 30));
     for (let i = step; i < latlngs.length; i += step) {
       const [lat1, lng1] = latlngs[i - 1];
       const [lat2, lng2] = latlngs[i];
@@ -710,11 +710,11 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       const mid   = [(lat1 + lat2) / 2, (lng1 + lng2) / 2];
       L.marker(mid, {
         icon: L.divIcon({
-          html: `<div style="transform:rotate(${angle}deg);font-size:14px;line-height:1;
-                   color:#1565C0;text-shadow:0 0 3px #fff,0 0 3px #fff;">▲</div>`,
+          html: `<div style="transform:rotate(${angle}deg);font-size:18px;line-height:1;
+                   color:#1565C0;text-shadow:0 0 4px #fff,0 0 4px #fff;">▲</div>`,
           className: '',
-          iconSize: [14, 14],
-          iconAnchor: [7, 7],
+          iconSize: [18, 18],
+          iconAnchor: [9, 9],
         }),
         interactive: false,
       }).addTo(this._map);
