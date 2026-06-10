@@ -40,6 +40,10 @@ const TRANSLATIONS = {
     remove:            'Remove',
     cluster_radius_lbl:'Cluster radius (m)',
     min_points_lbl:    'Minimum points per cluster',
+    theme_lbl:         'Theme',
+    theme_system:      'System',
+    theme_light:       'Light',
+    theme_dark:        'Dark',
     default_title:     'Track History',
   },
   es: {
@@ -62,6 +66,10 @@ const TRANSLATIONS = {
     remove:            'Eliminar',
     cluster_radius_lbl:'Radio de agrupación (m)',
     min_points_lbl:    'Puntos mínimos por agrupación',
+    theme_lbl:         'Tema',
+    theme_system:      'Sistema',
+    theme_light:       'Claro',
+    theme_dark:        'Oscuro',
     default_title:     'Track History',
   },
   fr: {
@@ -84,6 +92,10 @@ const TRANSLATIONS = {
     remove:            'Supprimer',
     cluster_radius_lbl:'Rayon de regroupement (m)',
     min_points_lbl:    'Points minimum par regroupement',
+    theme_lbl:         'Thème',
+    theme_system:      'Système',
+    theme_light:       'Clair',
+    theme_dark:        'Sombre',
     default_title:     'Track History',
   },
   de: {
@@ -106,6 +118,10 @@ const TRANSLATIONS = {
     remove:            'Entfernen',
     cluster_radius_lbl:'Gruppierungsradius (m)',
     min_points_lbl:    'Mindestpunkte pro Gruppierung',
+    theme_lbl:         'Design',
+    theme_system:      'System',
+    theme_light:       'Hell',
+    theme_dark:        'Dunkel',
     default_title:     'Track History',
   },
   it: {
@@ -128,6 +144,10 @@ const TRANSLATIONS = {
     remove:            'Rimuovi',
     cluster_radius_lbl:'Raggio di raggruppamento (m)',
     min_points_lbl:    'Punti minimi per raggruppamento',
+    theme_lbl:         'Tema',
+    theme_system:      'Sistema',
+    theme_light:       'Chiaro',
+    theme_dark:        'Scuro',
     default_title:     'Track History',
   },
   pt: {
@@ -150,6 +170,10 @@ const TRANSLATIONS = {
     remove:            'Remover',
     cluster_radius_lbl:'Raio de agrupamento (m)',
     min_points_lbl:    'Pontos mínimos por agrupamento',
+    theme_lbl:         'Tema',
+    theme_system:      'Sistema',
+    theme_light:       'Claro',
+    theme_dark:        'Escuro',
     default_title:     'Track History',
   },
 };
@@ -196,7 +220,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { entities: [], map_height: 400, cluster_radius: 100, min_points: 3 };
+    return { entities: [], map_height: 400, cluster_radius: 100, min_points: 3, theme: 'system' };
   }
 
   setConfig(config) {
@@ -208,9 +232,13 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       default_entity: null,
       cluster_radius: 100,
       min_points: 3,
+      theme: 'system',
       ...config,
     };
     this._build();
+    // Redraw the map on config changes (e.g. from the visual editor) once
+    // hass is available and the first load has already happened.
+    if (this._hass && this._autoLoaded) this._onLoad();
   }
 
   set hass(hass) {
@@ -478,6 +506,12 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
   // ── Map rendering ─────────────────────────────────────────────────────────
 
+  _resolveTheme() {
+    const t = this._config.theme || 'system';
+    if (t === 'light' || t === 'dark') return t;
+    return this._hass?.themes?.darkMode ? 'dark' : 'light';
+  }
+
   _drawTrack(L, points) {
     this._destroyMap();
 
@@ -493,10 +527,18 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       wheelPxPerZoomLevel: 250,
     });
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19,
-    }).addTo(this._map);
+    if (this._resolveTheme() === 'dark') {
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 19,
+      }).addTo(this._map);
+    } else {
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        maxZoom: 19,
+      }).addTo(this._map);
+    }
 
     const displayed = this._clusterPoints(points, this._config.cluster_radius, this._config.min_points);
     const latlngs   = displayed.map(p => [p.lat, p.lng]);
@@ -803,6 +845,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     const defaultValue  = this._config.default_entity || '';
     const clusterRadius = this._config.cluster_radius ?? 100;
     const minPoints     = this._config.min_points ?? 3;
+    const themeValue    = this._config.theme || 'system';
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -918,6 +961,15 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         </div>
 
         <div>
+          <div class="section-label">${this._t('theme_lbl')}</div>
+          <select id="f-theme" style="margin-top:0">
+            <option value="system" ${themeValue === 'system' ? 'selected' : ''}>${this._t('theme_system')}</option>
+            <option value="light" ${themeValue === 'light' ? 'selected' : ''}>${this._t('theme_light')}</option>
+            <option value="dark" ${themeValue === 'dark' ? 'selected' : ''}>${this._t('theme_dark')}</option>
+          </select>
+        </div>
+
+        <div>
           <div class="section-label">${this._t('map_height_lbl')}</div>
           <input type="number" id="f-height" class="text-input" style="margin-top:0"
             value="${map_height}" min="200" max="1000">
@@ -967,6 +1019,9 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
       this.shadowRoot.getElementById('f-default')
         .addEventListener('change', e => this._set('default_entity', e.target.value || null));
     }
+
+    this.shadowRoot.getElementById('f-theme')
+      .addEventListener('change', e => this._set('theme', e.target.value));
 
     this.shadowRoot.getElementById('f-cluster-radius')
       .addEventListener('change', e => {
