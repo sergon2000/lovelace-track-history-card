@@ -39,6 +39,7 @@ const TRANSLATIONS = {
     map_height_lbl:    'Map height (px)',
     remove:            'Remove',
     cluster_radius_lbl:'Cluster radius (m)',
+    min_points_lbl:    'Minimum points per cluster',
     default_title:     'Track History',
   },
   es: {
@@ -60,6 +61,7 @@ const TRANSLATIONS = {
     map_height_lbl:    'Altura del mapa (px)',
     remove:            'Eliminar',
     cluster_radius_lbl:'Radio de agrupación (m)',
+    min_points_lbl:    'Puntos mínimos por agrupación',
     default_title:     'Track History',
   },
   fr: {
@@ -81,6 +83,7 @@ const TRANSLATIONS = {
     map_height_lbl:    'Hauteur de la carte (px)',
     remove:            'Supprimer',
     cluster_radius_lbl:'Rayon de regroupement (m)',
+    min_points_lbl:    'Points minimum par regroupement',
     default_title:     'Track History',
   },
   de: {
@@ -102,6 +105,7 @@ const TRANSLATIONS = {
     map_height_lbl:    'Kartenhöhe (px)',
     remove:            'Entfernen',
     cluster_radius_lbl:'Gruppierungsradius (m)',
+    min_points_lbl:    'Mindestpunkte pro Gruppierung',
     default_title:     'Track History',
   },
   it: {
@@ -123,6 +127,7 @@ const TRANSLATIONS = {
     map_height_lbl:    'Altezza mappa (px)',
     remove:            'Rimuovi',
     cluster_radius_lbl:'Raggio di raggruppamento (m)',
+    min_points_lbl:    'Punti minimi per raggruppamento',
     default_title:     'Track History',
   },
   pt: {
@@ -144,6 +149,7 @@ const TRANSLATIONS = {
     map_height_lbl:    'Altura do mapa (px)',
     remove:            'Remover',
     cluster_radius_lbl:'Raio de agrupamento (m)',
+    min_points_lbl:    'Pontos mínimos por agrupamento',
     default_title:     'Track History',
   },
 };
@@ -190,7 +196,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { entities: [], map_height: 400, cluster_radius: 100 };
+    return { entities: [], map_height: 400, cluster_radius: 100, min_points: 2 };
   }
 
   setConfig(config) {
@@ -201,6 +207,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       map_height: 400,
       default_entity: null,
       cluster_radius: 100,
+      min_points: 2,
       ...config,
     };
     this._build();
@@ -491,7 +498,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       maxZoom: 19,
     }).addTo(this._map);
 
-    const displayed = this._clusterPoints(points, this._config.cluster_radius);
+    const displayed = this._clusterPoints(points, this._config.cluster_radius, this._config.min_points);
     const latlngs   = displayed.map(p => [p.lat, p.lng]);
 
     // Main track polyline — geometry smoothed with a Catmull-Rom spline so
@@ -580,8 +587,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return L.marker([point.lat, point.lng], { icon }).bindPopup(this._popupHtml(point));
   }
 
-  _clusterPoints(points, radiusMeters) {
+  _clusterPoints(points, radiusMeters, minPoints = 2) {
     if (!radiusMeters || points.length === 0) return points.map(p => ({ ...p, count: 1 }));
+    const minPts = Math.max(2, minPoints || 2);
 
     // Sequential clustering: a cluster is a run of CONSECUTIVE points that
     // stay within radiusMeters of the running centroid. Leaving the radius
@@ -605,20 +613,26 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     }
     groups.push(group);
 
-    // One representative entry per group, in order, so the polyline still
-    // reflects the actual route.
-    return groups.map(g => {
-      if (g.length === 1) return { ...g[0], count: 1 };
-      return {
-        lat: g.reduce((s, p) => s + p.lat, 0) / g.length,
-        lng: g.reduce((s, p) => s + p.lng, 0) / g.length,
-        time:   g[0].time,
-        timeTo: g[g.length - 1].time,
-        count:  g.length,
-        accuracy: 0,
-        state:  g[0].state,
-      };
-    });
+    // Groups with at least minPts points become a cluster (one centroid
+    // entry). Smaller groups are treated as in-transit and kept as their
+    // individual points so the polyline still reflects the actual route.
+    const result = [];
+    for (const g of groups) {
+      if (g.length >= minPts) {
+        result.push({
+          lat: g.reduce((s, p) => s + p.lat, 0) / g.length,
+          lng: g.reduce((s, p) => s + p.lng, 0) / g.length,
+          time:   g[0].time,
+          timeTo: g[g.length - 1].time,
+          count:  g.length,
+          accuracy: 0,
+          state:  g[0].state,
+        });
+      } else {
+        for (const p of g) result.push({ ...p, count: 1 });
+      }
+    }
+    return result;
   }
 
   _destroyMap() {
@@ -788,6 +802,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     const hasDefault    = !!this._config.default_entity;
     const defaultValue  = this._config.default_entity || '';
     const clusterRadius = this._config.cluster_radius ?? 100;
+    const minPoints     = this._config.min_points ?? 2;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -913,6 +928,12 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           <input type="number" id="f-cluster-radius" class="text-input" style="margin-top:0"
             value="${clusterRadius}" min="1" max="10000">
         </div>
+
+        <div>
+          <div class="section-label">${this._t('min_points_lbl')}</div>
+          <input type="number" id="f-min-points" class="text-input" style="margin-top:0"
+            value="${minPoints}" min="2" max="100">
+        </div>
       </div>
     `;
 
@@ -951,6 +972,12 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
       .addEventListener('change', e => {
         const v = parseInt(e.target.value, 10);
         this._set('cluster_radius', (!isNaN(v) && v >= 1) ? v : 100);
+      });
+
+    this.shadowRoot.getElementById('f-min-points')
+      .addEventListener('change', e => {
+        const v = parseInt(e.target.value, 10);
+        this._set('min_points', (!isNaN(v) && v >= 2) ? v : 2);
       });
 
     this.shadowRoot.getElementById('f-height')
