@@ -368,6 +368,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         width: 100%;
         box-sizing: border-box;
         height: 38px;
+        text-align: center;
       }
 /* Alert banner */
       .alert {
