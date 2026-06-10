@@ -258,9 +258,6 @@ class LovelaceTrackHistoryCard extends HTMLElement {
               <label>${this._t('date')}</label>
               <input type="date" id="date-picker" value="${today}" max="${today}" />
             </div>
-            <button id="load-btn">
-              <span id="btn-label">${this._t('load')}</span>
-            </button>
           </div>
           <div id="alert" class="alert hidden"></div>
           <div id="map-wrap">
@@ -272,8 +269,10 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       </ha-card>
     `;
 
-    this.shadowRoot.getElementById('load-btn')
-      .addEventListener('click', () => this._onLoad());
+    this.shadowRoot.getElementById('entity-select')
+      .addEventListener('change', () => this._onLoad());
+    this.shadowRoot.getElementById('date-picker')
+      .addEventListener('change', () => this._onLoad());
   }
 
   _css(mapHeight) {
@@ -323,24 +322,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         box-sizing: border-box;
         height: 38px;
       }
-      button {
-        padding: 0 20px;
-        height: 38px;
-        background: var(--primary-color, #03a9f4);
-        color: #fff;
-        border: none;
-        border-radius: 6px;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-        white-space: nowrap;
-        transition: opacity .15s;
-        min-width: 80px;
-      }
-      button:hover:not(:disabled) { opacity: 0.88; }
-      button:disabled { opacity: 0.55; cursor: default; }
-
-      /* Alert banner */
+/* Alert banner */
       .alert {
         padding: 9px 12px;
         border-radius: 6px;
@@ -393,10 +375,6 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const date     = this.shadowRoot.getElementById('date-picker').value;
     if (!entityId || !date) return;
 
-    const btn   = this.shadowRoot.getElementById('load-btn');
-    const label = this.shadowRoot.getElementById('btn-label');
-    btn.disabled = true;
-    label.textContent = this._t('loading');
     this._setAlert('');
     this._setSummary(null);
     this._setNoData(false);
@@ -417,10 +395,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     } catch (err) {
       console.error('[lovelace-track-history-card]', err);
       this._setAlert(`${this._t('error')}: ${err.message}`, 'error');
-    } finally {
-      btn.disabled = false;
-      label.textContent = this._t('load');
-    }
+    } finally {}
   }
 
   async _fetchPoints(entityId, date) {
