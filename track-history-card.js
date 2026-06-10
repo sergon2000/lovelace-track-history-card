@@ -256,7 +256,11 @@ class LovelaceTrackHistoryCard extends HTMLElement {
             </div>
             <div class="ctrl-group">
               <label>${this._t('date')}</label>
-              <input type="date" id="date-picker" value="${today}" max="${today}" />
+              <div class="date-nav">
+                <button type="button" class="date-nav-btn" id="date-prev">&#8249;</button>
+                <input type="date" id="date-picker" value="${today}" max="${today}" />
+                <button type="button" class="date-nav-btn" id="date-next" ${today === today ? 'disabled' : ''}>&#8250;</button>
+              </div>
             </div>
           </div>
           <div id="alert" class="alert hidden"></div>
@@ -271,8 +275,28 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
     this.shadowRoot.getElementById('entity-select')
       .addEventListener('change', () => this._onLoad());
-    this.shadowRoot.getElementById('date-picker')
-      .addEventListener('change', () => this._onLoad());
+
+    const datePicker = this.shadowRoot.getElementById('date-picker');
+    const dateNext   = this.shadowRoot.getElementById('date-next');
+    datePicker.addEventListener('change', () => {
+      dateNext.disabled = datePicker.value >= today;
+      this._onLoad();
+    });
+    this.shadowRoot.getElementById('date-prev')
+      .addEventListener('click', () => {
+        const d = new Date(datePicker.value + 'T12:00:00');
+        d.setDate(d.getDate() - 1);
+        datePicker.value = d.toISOString().slice(0, 10);
+        dateNext.disabled = false;
+        this._onLoad();
+      });
+    dateNext.addEventListener('click', () => {
+      const d = new Date(datePicker.value + 'T12:00:00');
+      d.setDate(d.getDate() + 1);
+      datePicker.value = d.toISOString().slice(0, 10);
+      dateNext.disabled = datePicker.value >= today;
+      this._onLoad();
+    });
   }
 
   _css(mapHeight) {
@@ -311,6 +335,28 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         letter-spacing: 0.06em;
         color: var(--secondary-text-color, #888);
       }
+      .date-nav {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+      }
+      .date-nav input[type="date"] { flex: 1; }
+      .date-nav-btn {
+        flex-shrink: 0;
+        width: 30px;
+        height: 38px;
+        padding: 0;
+        background: var(--card-background-color, #fff);
+        color: var(--primary-text-color, #333);
+        border: 1px solid var(--divider-color, #e0e0e0);
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+        transition: opacity .15s;
+      }
+      .date-nav-btn:hover:not(:disabled) { opacity: 0.7; }
+      .date-nav-btn:disabled { opacity: 0.3; cursor: default; }
       select, input[type="date"] {
         padding: 8px 10px;
         border: 1px solid var(--divider-color, #e0e0e0);
