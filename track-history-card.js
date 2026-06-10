@@ -720,29 +720,35 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return d.toFixed(1);
   }
 
-  _smoothPath(latlngs, steps = 12) {
+  _smoothPath(latlngs, iterations = 3) {
     if (latlngs.length < 3) return latlngs;
-    const pts = latlngs;
-    const out = [pts[0]];
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i - 1] || pts[i];
-      const p1 = pts[i];
-      const p2 = pts[i + 1];
-      const p3 = pts[i + 2] || p2;
-      for (let s = 1; s <= steps; s++) {
-        const t  = s / steps;
-        const t2 = t * t;
-        const t3 = t2 * t;
-        const lat = 0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * t
-          + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * t2
-          + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * t3);
-        const lng = 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * t
-          + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * t2
-          + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * t3);
-        out.push([lat, lng]);
+
+    // Drop near-duplicate consecutive points so real corners stand out,
+    // otherwise dense GPS samples leave nothing visible to round.
+    let pts = [latlngs[0]];
+    for (let i = 1; i < latlngs.length; i++) {
+      if (this._haversine({ lat: pts[pts.length - 1][0], lng: pts[pts.length - 1][1] },
+                          { lat: latlngs[i][0], lng: latlngs[i][1] }) * 1000 > 15) {
+        pts.push(latlngs[i]);
       }
     }
-    return out;
+    if (pts[pts.length - 1] !== latlngs[latlngs.length - 1]) pts.push(latlngs[latlngs.length - 1]);
+    if (pts.length < 3) return latlngs;
+
+    // Chaikin corner-cutting: each pass replaces every segment with points at
+    // 25% and 75%, visibly rounding sharp corners. Endpoints are preserved.
+    for (let it = 0; it < iterations; it++) {
+      const next = [pts[0]];
+      for (let i = 0; i < pts.length - 1; i++) {
+        const [a0, a1] = pts[i];
+        const [b0, b1] = pts[i + 1];
+        next.push([a0 * 0.75 + b0 * 0.25, a1 * 0.75 + b1 * 0.25]);
+        next.push([a0 * 0.25 + b0 * 0.75, a1 * 0.25 + b1 * 0.75]);
+      }
+      next.push(pts[pts.length - 1]);
+      pts = next;
+    }
+    return pts;
   }
 
   _addArrows(L, latlngs) {
