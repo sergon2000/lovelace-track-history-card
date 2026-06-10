@@ -44,6 +44,7 @@ const TRANSLATIONS = {
     theme_system:      'System',
     theme_light:       'Light',
     theme_dark:        'Dark',
+    advanced_lbl:      'Advanced',
     default_title:     'Track History',
   },
   es: {
@@ -70,6 +71,7 @@ const TRANSLATIONS = {
     theme_system:      'Sistema',
     theme_light:       'Claro',
     theme_dark:        'Oscuro',
+    advanced_lbl:      'Avanzado',
     default_title:     'Track History',
   },
   fr: {
@@ -96,6 +98,7 @@ const TRANSLATIONS = {
     theme_system:      'Système',
     theme_light:       'Clair',
     theme_dark:        'Sombre',
+    advanced_lbl:      'Avancé',
     default_title:     'Track History',
   },
   de: {
@@ -122,6 +125,7 @@ const TRANSLATIONS = {
     theme_system:      'System',
     theme_light:       'Hell',
     theme_dark:        'Dunkel',
+    advanced_lbl:      'Erweitert',
     default_title:     'Track History',
   },
   it: {
@@ -148,6 +152,7 @@ const TRANSLATIONS = {
     theme_system:      'Sistema',
     theme_light:       'Chiaro',
     theme_dark:        'Scuro',
+    advanced_lbl:      'Avanzate',
     default_title:     'Track History',
   },
   pt: {
@@ -174,6 +179,7 @@ const TRANSLATIONS = {
     theme_system:      'Sistema',
     theme_light:       'Claro',
     theme_dark:        'Escuro',
+    advanced_lbl:      'Avançado',
     default_title:     'Track History',
   },
 };
@@ -936,6 +942,20 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           accent-color: var(--primary-color, #03a9f4);
           flex-shrink: 0;
         }
+        .advanced {
+          border-top: 1px solid var(--divider-color, #e0e0e0);
+          padding-top: 16px;
+        }
+        .advanced > summary {
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--primary-text-color, #333);
+          user-select: none;
+          list-style: revert;
+        }
+        .advanced[open] > summary { margin-bottom: 16px; }
+        .advanced > div + div { margin-top: 16px; }
         select {
           width: 100%;
           padding: 8px 10px;
@@ -992,23 +1012,26 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           </div>
         </div>
 
-        <div>
-          <div class="section-label">${this._t('map_height_lbl')}</div>
-          <input type="number" id="f-height" class="text-input" style="margin-top:0"
-            value="${map_height}" min="200" max="1000">
-        </div>
+        <details class="advanced">
+          <summary>${this._t('advanced_lbl')}</summary>
+          <div>
+            <div class="section-label">${this._t('map_height_lbl')}</div>
+            <input type="number" id="f-height" class="text-input" style="margin-top:0"
+              value="${map_height}" min="200" max="1000">
+          </div>
 
-        <div>
-          <div class="section-label">${this._t('cluster_radius_lbl')}</div>
-          <input type="number" id="f-cluster-radius" class="text-input" style="margin-top:0"
-            value="${clusterRadius}" min="1" max="10000">
-        </div>
+          <div>
+            <div class="section-label">${this._t('cluster_radius_lbl')}</div>
+            <input type="number" id="f-cluster-radius" class="text-input" style="margin-top:0"
+              value="${clusterRadius}" min="1" max="10000">
+          </div>
 
-        <div>
-          <div class="section-label">${this._t('min_points_lbl')}</div>
-          <input type="number" id="f-min-points" class="text-input" style="margin-top:0"
-            value="${minPoints}" min="2" max="100">
-        </div>
+          <div>
+            <div class="section-label">${this._t('min_points_lbl')}</div>
+            <input type="number" id="f-min-points" class="text-input" style="margin-top:0"
+              value="${minPoints}" min="2" max="100">
+          </div>
+        </details>
       </div>
     `;
 
