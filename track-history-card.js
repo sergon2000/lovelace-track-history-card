@@ -969,6 +969,12 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         }
       </style>
       <div class="editor">
+        <div>
+          <div class="section-label">${this._t('tracked_devs')}</div>
+          <div id="entities-list"></div>
+          <button class="add-btn" id="add-entity">${this._t('add_device')}</button>
+        </div>
+
         <div class="check-row">
           <label class="check-label">
             <input type="checkbox" id="title-check" ${hasTitle ? 'checked' : ''}>
@@ -977,12 +983,6 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           <input type="text" id="f-title" class="text-input"
             placeholder="${this._t('default_title')}" value="${titleValue}"
             style="display:${hasTitle ? 'block' : 'none'}">
-        </div>
-
-        <div>
-          <div class="section-label">${this._t('tracked_devs')}</div>
-          <div id="entities-list"></div>
-          <button class="add-btn" id="add-entity">${this._t('add_device')}</button>
         </div>
 
         <div>
