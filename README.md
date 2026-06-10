@@ -21,6 +21,7 @@ A custom Lovelace card for [Home Assistant](https://www.home-assistant.io/) that
 - **Start** (green) and **End** (red) pin markers with popup details
 - Nearby points are grouped into **stop clusters** (configurable radius) showing visit count and per-visit time ranges; in-transit points are not marked, so only the path line represents them
 - Summary bar with total points, time range, and approximate distance
+- Optional **Timeline** panel below the map listing each stop (with its time range) and the distance travelled while moving between stops
 - Adapts to the Home Assistant theme (light / dark)
 
 ---
@@ -62,6 +63,7 @@ The card supports a **visual editor** — click the pencil icon after adding the
 - **Tracked devices** — add / remove `device_tracker` entities with an autocomplete picker
 - **Default device** — entity pre-selected on load (dropdown populated from the list above)
 - **Theme** — map theme: System (follows Home Assistant), Light, or Dark
+- **Timeline** — show a panel below the map listing stops and movements
 - **Map height** — map height in pixels
 - **Cluster radius** — distance in meters within which nearby points are grouped into a single stop cluster
 - **Minimum points per cluster** — how many consecutive points within the radius are needed to form a cluster
@@ -77,6 +79,7 @@ entities:
   - device_tracker.car_tracker
 default_entity: device_tracker.jane_iphone
 theme: system
+show_timeline: true
 map_height: 450
 cluster_radius: 100
 min_points: 3
@@ -90,6 +93,7 @@ min_points: 3
 | `title` | `string` | `Movement History` | Card title displayed in the header |
 | `default_entity` | `string` | first entity | Entity pre-selected in the dropdown on load. Must be present in `entities`. If omitted or not found, the first entity is used. |
 | `theme` | `string` | `system` | Map theme: `system` (follows the Home Assistant light/dark mode), `light`, or `dark`. |
+| `show_timeline` | `boolean` | `false` | Show a timeline panel below the map listing each stop with its time range and the distance travelled between stops. |
 | `map_height` | `number` | `400` | Map height in pixels |
 | `cluster_radius` | `number` | `100` | Radius in meters for grouping nearby points into stop clusters. Points outside any cluster are treated as in-transit and are not marked individually. |
 | `min_points` | `number` | `3` | Minimum number of consecutive points within the radius required to form a cluster. Runs shorter than this are treated as in-transit. |

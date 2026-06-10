@@ -45,6 +45,9 @@ const TRANSLATIONS = {
     theme_light:       'Light',
     theme_dark:        'Dark',
     advanced_lbl:      'Advanced',
+    timeline_lbl:      'Timeline',
+    stop_n:            'Stop',
+    moving:            'Moving',
     default_title:     'Track History',
   },
   es: {
@@ -72,6 +75,9 @@ const TRANSLATIONS = {
     theme_light:       'Claro',
     theme_dark:        'Oscuro',
     advanced_lbl:      'Avanzado',
+    timeline_lbl:      'Cronología',
+    stop_n:            'Parada',
+    moving:            'En movimiento',
     default_title:     'Track History',
   },
   fr: {
@@ -99,6 +105,9 @@ const TRANSLATIONS = {
     theme_light:       'Clair',
     theme_dark:        'Sombre',
     advanced_lbl:      'Avancé',
+    timeline_lbl:      'Chronologie',
+    stop_n:            'Arrêt',
+    moving:            'En mouvement',
     default_title:     'Track History',
   },
   de: {
@@ -126,6 +135,9 @@ const TRANSLATIONS = {
     theme_light:       'Hell',
     theme_dark:        'Dunkel',
     advanced_lbl:      'Erweitert',
+    timeline_lbl:      'Zeitleiste',
+    stop_n:            'Halt',
+    moving:            'In Bewegung',
     default_title:     'Track History',
   },
   it: {
@@ -153,6 +165,9 @@ const TRANSLATIONS = {
     theme_light:       'Chiaro',
     theme_dark:        'Scuro',
     advanced_lbl:      'Avanzate',
+    timeline_lbl:      'Cronologia',
+    stop_n:            'Sosta',
+    moving:            'In movimento',
     default_title:     'Track History',
   },
   pt: {
@@ -180,6 +195,9 @@ const TRANSLATIONS = {
     theme_light:       'Claro',
     theme_dark:        'Escuro',
     advanced_lbl:      'Avançado',
+    timeline_lbl:      'Cronologia',
+    stop_n:            'Paragem',
+    moving:            'Em movimento',
     default_title:     'Track History',
   },
 };
@@ -307,6 +325,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
             <div id="no-data" class="no-data hidden">${this._t('no_data')}</div>
           </div>
           <div id="summary" class="summary hidden"></div>
+          <div id="timeline" class="timeline hidden"></div>
         </div>
       </ha-card>
     `;
@@ -448,6 +467,44 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       }
       .summary-item { display: flex; align-items: center; gap: 5px; }
 
+      /* Timeline panel */
+      .timeline {
+        margin-top: 14px;
+        border-top: 1px solid var(--divider-color, #e0e0e0);
+        padding-top: 12px;
+      }
+      .tl-header {
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--secondary-text-color, #888);
+        margin-bottom: 10px;
+      }
+      .tl-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        font-size: 13px;
+        color: var(--primary-text-color, #333);
+      }
+      .tl-icon {
+        flex-shrink: 0;
+        width: 22px;
+        text-align: center;
+        line-height: 1.5;
+      }
+      .tl-body { flex: 1; padding-bottom: 10px; }
+      .tl-title { font-weight: 500; }
+      .tl-sub {
+        font-size: 12px;
+        color: var(--secondary-text-color, #888);
+      }
+      .tl-move {
+        color: var(--secondary-text-color, #888);
+        font-style: italic;
+      }
+
       /* Leaflet popup override */
       .leaflet-popup-content { font-size: 13px; line-height: 1.5; }
     `;
@@ -462,6 +519,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
     this._setAlert('');
     this._setSummary(null);
+    this._setTimeline(null);
     this._setNoData(false);
 
     try {
@@ -474,8 +532,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         this._setNoData(true);
       } else {
         this._setNoData(false);
-        this._drawTrack(L, points);
+        const displayed = this._drawTrack(L, points);
         this._setSummary(points);
+        this._setTimeline(displayed);
       }
     } catch (err) {
       console.error('[lovelace-track-history-card]', err);
@@ -576,6 +635,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     }
 
     this._map.fitBounds(L.latLngBounds(latlngs), { padding: [32, 32], animate: false });
+    return displayed;
   }
 
   _pinMarker(L, point, color, letter, label) {
@@ -720,6 +780,72 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     el.className = 'summary';
   }
 
+  _setTimeline(displayed) {
+    const el = this.shadowRoot.getElementById('timeline');
+    if (!el) return;
+    if (!displayed || !this._config.show_timeline) { el.className = 'timeline hidden'; return; }
+
+    const items = this._buildTimeline(displayed);
+    if (items.length === 0) { el.className = 'timeline hidden'; return; }
+
+    const fmt = t => t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const rows = items.map(it => {
+      if (it.type === 'stop') {
+        return `
+          <div class="tl-item">
+            <div class="tl-icon">📍</div>
+            <div class="tl-body">
+              <div class="tl-title">${this._t('stop_n')} ${it.n}</div>
+              <div class="tl-sub">🕐 ${fmt(it.time)} – ${fmt(it.timeTo)}</div>
+            </div>
+          </div>`;
+      }
+      return `
+        <div class="tl-item">
+          <div class="tl-icon">↓</div>
+          <div class="tl-body tl-move">${this._t('moving')} · ~${this._fmtDist(it.dist)}</div>
+        </div>`;
+    }).join('');
+
+    el.innerHTML = `<div class="tl-header">${this._t('timeline_lbl')}</div>${rows}`;
+    el.className = 'timeline';
+  }
+
+  _buildTimeline(displayed) {
+    const segDist = (from, to) => {
+      let d = 0;
+      for (let k = from; k < to; k++) d += this._haversine(displayed[k], displayed[k + 1]);
+      return d; // km
+    };
+    const stops = [];
+    displayed.forEach((p, i) => { if (p.count > 1) stops.push(i); });
+
+    const items = [];
+    if (stops.length === 0) {
+      if (displayed.length > 1) items.push({ type: 'move', dist: segDist(0, displayed.length - 1) });
+      return items;
+    }
+
+    // Movement before the first stop
+    if (stops[0] > 0) items.push({ type: 'move', dist: segDist(0, stops[0]) });
+
+    stops.forEach((idx, s) => {
+      const p = displayed[idx];
+      items.push({ type: 'stop', n: s + 1, time: p.time, timeTo: p.timeTo });
+      if (s < stops.length - 1) items.push({ type: 'move', dist: segDist(idx, stops[s + 1]) });
+    });
+
+    // Movement after the last stop
+    const last = stops[stops.length - 1];
+    if (last < displayed.length - 1) items.push({ type: 'move', dist: segDist(last, displayed.length - 1) });
+
+    return items;
+  }
+
+  _fmtDist(km) {
+    return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+  }
+
   // ── Leaflet CSS injection ─────────────────────────────────────────────────
 
   async _injectLeafletCss() {
@@ -852,6 +978,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     const clusterRadius = this._config.cluster_radius ?? 100;
     const minPoints     = this._config.min_points ?? 3;
     const themeValue    = this._config.theme || 'system';
+    const showTimeline  = !!this._config.show_timeline;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -1013,6 +1140,13 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           </div>
         </div>
 
+        <div>
+          <label class="check-label">
+            <input type="checkbox" id="timeline-check" ${showTimeline ? 'checked' : ''}>
+            <span>${this._t('timeline_lbl')}</span>
+          </label>
+        </div>
+
         <details class="advanced">
           <summary>${this._t('advanced_lbl')}</summary>
           <div>
@@ -1071,6 +1205,9 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
       .forEach(r => r.addEventListener('change', e => {
         if (e.target.checked) this._set('theme', e.target.value);
       }));
+
+    this.shadowRoot.getElementById('timeline-check')
+      .addEventListener('change', e => this._set('show_timeline', e.target.checked ? true : null));
 
     this.shadowRoot.getElementById('f-cluster-radius')
       .addEventListener('change', e => {
