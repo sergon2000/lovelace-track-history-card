@@ -756,7 +756,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     const hasDefault    = !!this._config.default_entity;
     const defaultValue  = this._config.default_entity || '';
     const hasClustering = this._showClustering;
-    const clusterRadius = this._config.cluster_radius ?? 50;
+    const clusterRadius = this._config.cluster_radius ?? 100;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -923,7 +923,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         const field = this.shadowRoot.getElementById('f-cluster-radius');
         field.style.display = e.target.checked ? 'block' : 'none';
         if (!e.target.checked) this._set('cluster_radius', null);
-        else if (!this._config.cluster_radius) this._set('cluster_radius', 50);
+        else if (!this._config.cluster_radius) this._set('cluster_radius', 100);
       });
 
     this.shadowRoot.getElementById('f-cluster-radius')
