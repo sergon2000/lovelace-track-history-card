@@ -656,10 +656,13 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const displayed = this._clusterPoints(points, this._config.cluster_radius, this._config.min_points);
     this._numberStops(displayed);
     const latlngs   = displayed.map(p => [p.lat, p.lng]);
+    // Stops (clusters) are anchors the smoothed line must pass through, so it
+    // never cuts the corner of an isolated stop and leaves its marker uncrossed.
+    const anchors   = displayed.reduce((a, p, i) => (p.count > 1 && a.push(i), a), []);
 
-    // Main track polyline — geometry smoothed with a Catmull-Rom spline so
-    // the path curves gently through the points instead of sharp corners.
-    L.polyline(this._smoothPath(latlngs), {
+    // Main track polyline — smoothed per segment between anchors so the line
+    // curves gently yet still passes exactly through every stop, start and end.
+    L.polyline(this._smoothPath(latlngs, anchors), {
       color: '#1565C0', weight: 5, opacity: 0.85,
       lineJoin: 'round', lineCap: 'round',
     }).addTo(this._map);
@@ -924,20 +927,38 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return d.toFixed(1);
   }
 
-  _smoothPath(latlngs, iterations = 3) {
+  _smoothPath(latlngs, anchors = [], iterations = 3) {
+    if (latlngs.length < 3) return latlngs;
+
+    // Split the path at anchor indices (stops) and smooth each segment
+    // independently. Chaikin preserves a segment's endpoints, so the line
+    // always passes exactly through every anchor instead of cutting its corner.
+    const bounds = Array.from(new Set([0, ...anchors, latlngs.length - 1]))
+      .sort((a, b) => a - b);
+
+    const out = [];
+    for (let b = 0; b < bounds.length - 1; b++) {
+      const seg = this._chaikin(latlngs.slice(bounds[b], bounds[b + 1] + 1), iterations);
+      out.push(...(b === 0 ? seg : seg.slice(1)));
+    }
+    return out;
+  }
+
+  _chaikin(latlngs, iterations) {
     if (latlngs.length < 3) return latlngs;
 
     // Drop near-duplicate consecutive points so real corners stand out,
-    // otherwise dense GPS samples leave nothing visible to round.
+    // otherwise dense GPS samples leave nothing visible to round. The
+    // segment's first and last points (anchors) are always kept.
     let pts = [latlngs[0]];
-    for (let i = 1; i < latlngs.length; i++) {
+    for (let i = 1; i < latlngs.length - 1; i++) {
       if (this._haversine({ lat: pts[pts.length - 1][0], lng: pts[pts.length - 1][1] },
                           { lat: latlngs[i][0], lng: latlngs[i][1] }) * 1000 > 15) {
         pts.push(latlngs[i]);
       }
     }
-    if (pts[pts.length - 1] !== latlngs[latlngs.length - 1]) pts.push(latlngs[latlngs.length - 1]);
-    if (pts.length < 3) return latlngs;
+    pts.push(latlngs[latlngs.length - 1]);
+    if (pts.length < 3) return pts;
 
     // Chaikin corner-cutting: each pass replaces every segment with points at
     // 25% and 75%, visibly rounding sharp corners. Endpoints are preserved.
