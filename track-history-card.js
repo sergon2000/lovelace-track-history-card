@@ -556,33 +556,20 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   async _fetchPoints(entityId, date) {
     // Local day boundaries → explicit UTC instants for the API.
     const startISO = new Date(`${date}T00:00:00`).toISOString();
-    const endISO   = new Date(`${date}T23:59:59`).toISOString();
+    const endISO   = new Date(`${date}T23:59:59.999`).toISOString();
 
-    // Use the WebSocket history API (history_during_period) — the same one the
-    // HA History panel uses. The REST `history/period` endpoint returns []
-    // for fully past days in many setups, while this one returns them
-    // correctly. minimal_response/no_attributes must be false to keep GPS
-    // attributes; significant_changes_only false to get every update.
-    const result = await this._hass.callWS({
-      type: 'history/history_during_period',
-      start_time: startISO,
-      end_time: endISO,
-      entity_ids: [entityId],
-      significant_changes_only: false,
-      minimal_response: false,
-      no_attributes: false,
-    });
+    // Use the `history/stream` WS subscription — the same one the HA History
+    // panel uses. The REST `history/period` endpoint and the one-shot
+    // `history/history_during_period` command both return empty for fully past
+    // days in recent HA versions; `history/stream` returns them correctly.
+    const list = await this._streamHistory(entityId, startISO, endISO);
 
-    console.info('[track-history] WS range %s … %s | keys=%o | raw=%d', startISO, endISO,
-      result && Object.keys(result), (result?.[entityId] ?? []).length, result);
-
-    const list = result?.[entityId] ?? [];
     let lastA = {};
     return list
       .map(s => {
-        // Compact WS keys: s=state, a=attributes, lu=last_updated,
+        // Compact keys: s=state, a=attributes, lu=last_updated,
         // lc=last_changed (epoch seconds). Attributes carry forward when
-        // unchanged. Fall back to verbose keys for older HA versions.
+        // unchanged. Verbose keys are a fallback for older HA versions.
         const a = s.a ?? s.attributes;
         if (a) lastA = { ...lastA, ...a };
         const t = s.lu ?? s.lc ?? s.last_updated ?? s.last_changed;
@@ -595,6 +582,40 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         };
       })
       .filter(p => p.lat != null && p.lng != null);
+  }
+
+  _streamHistory(entityId, startISO, endISO) {
+    // `history/stream` is a subscription: the first event carries the initial
+    // history, followed by live updates. We take that first event and
+    // unsubscribe immediately.
+    return new Promise((resolve, reject) => {
+      let unsub = null;
+      let done = false;
+      const finish = (val) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (unsub) { try { unsub(); } catch (_) { /* ignore */ } }
+        resolve(val);
+      };
+      const timer = setTimeout(() => finish([]), 15000);
+
+      this._hass.connection.subscribeMessage(
+        (msg) => { if (msg && msg.states) finish(msg.states[entityId] ?? []); },
+        {
+          type: 'history/stream',
+          entity_ids: [entityId],
+          start_time: startISO,
+          end_time: endISO,
+          minimal_response: false,
+          no_attributes: false,
+          significant_changes_only: false,
+        }
+      ).then((u) => {
+        unsub = u;
+        if (done) { try { u(); } catch (_) { /* ignore */ } }
+      }).catch(reject);
+    });
   }
 
   // ── Map rendering ─────────────────────────────────────────────────────────
