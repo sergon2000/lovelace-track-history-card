@@ -453,6 +453,11 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         border-radius: 8px;
         overflow: hidden;
         border: 1px solid var(--divider-color, #e0e0e0);
+        /* Contain Leaflet's high z-index panes/controls in their own stacking
+           context so they don't render above the Home Assistant header.
+           Leaflet's internal pane ordering is preserved inside the context. */
+        isolation: isolate;
+        z-index: 0;
       }
       #map { width: 100%; height: ${mapHeight}px; }
       .no-data {
