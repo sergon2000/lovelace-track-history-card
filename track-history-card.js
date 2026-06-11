@@ -282,6 +282,10 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return TRANSLATIONS[getLang(this._hass)][key];
   }
 
+  _initial(key) {
+    return (this._t(key) || '').charAt(0).toUpperCase();
+  }
+
   disconnectedCallback() {
     this._destroyMap();
   }
@@ -626,12 +630,12 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       });
     }
 
-    // Start marker (green)
-    this._pinMarker(L, displayed[0], '#2E7D32', 'S', this._t('start')).addTo(this._map);
+    // Start marker (green) — initial derived from the localized "start" label
+    this._pinMarker(L, displayed[0], '#2E7D32', this._initial('start'), this._t('start')).addTo(this._map);
 
     // End marker (red) — only if more than one point
     if (displayed.length > 1) {
-      this._pinMarker(L, displayed[displayed.length - 1], '#C62828', 'E', this._t('end')).addTo(this._map);
+      this._pinMarker(L, displayed[displayed.length - 1], '#C62828', this._initial('end'), this._t('end')).addTo(this._map);
     }
 
     this._map.fitBounds(L.latLngBounds(latlngs), { padding: [32, 32], animate: false });
@@ -791,11 +795,15 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const fmt = t => t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const rows = items.map(it => {
       if (it.type === 'stop') {
+        const title = it.role === 'start' ? this._t('start')
+          : it.role === 'end' ? this._t('end')
+          : `${this._t('stop_n')} ${it.n}`;
+        const icon = it.role === 'start' ? '🟢' : it.role === 'end' ? '🔴' : '📍';
         return `
           <div class="tl-item">
-            <div class="tl-icon">📍</div>
+            <div class="tl-icon">${icon}</div>
             <div class="tl-body">
-              <div class="tl-title">${this._t('stop_n')} ${it.n}</div>
+              <div class="tl-title">${title}</div>
               <div class="tl-sub">🕐 ${fmt(it.time)} – ${fmt(it.timeTo)}</div>
             </div>
           </div>`;
@@ -831,7 +839,8 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
     stops.forEach((idx, s) => {
       const p = displayed[idx];
-      items.push({ type: 'stop', n: s + 1, time: p.time, timeTo: p.timeTo });
+      const role = s === 0 ? 'start' : (s === stops.length - 1 ? 'end' : 'mid');
+      items.push({ type: 'stop', n: s + 1, role, time: p.time, timeTo: p.timeTo });
       if (s < stops.length - 1) items.push({ type: 'move', dist: segDist(idx, stops[s + 1]) });
     });
 
