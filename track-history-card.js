@@ -536,6 +536,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       await this._injectLeafletCss();
       const L = await ensureLeaflet();
       const points = await this._fetchPoints(entityId, date);
+      console.info('[track-history] %s %s → %d points', entityId, date, points.length);
 
       if (points.length === 0) {
         this._destroyMap();
