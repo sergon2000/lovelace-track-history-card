@@ -295,6 +295,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   _build() {
     const today = new Date().toISOString().split('T')[0];
     const h = this._config.map_height;
+    // Preserve the selected date/device across rebuilds (e.g. editor changes).
+    const selDate   = this._selectedDate || today;
+    const selEntity = this._selectedEntity || this._config.default_entity;
 
     this.shadowRoot.innerHTML = `
       <style>${this._css(h)}</style>
@@ -309,7 +312,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
                 ${this._config.entities.map(e => {
                   const label = this._hass?.states[e]?.attributes?.friendly_name
                     || e.replace('device_tracker.', '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                  const selected = e === this._config.default_entity ? ' selected' : '';
+                  const selected = e === selEntity ? ' selected' : '';
                   return `<option value="${e}"${selected}>${label}</option>`;
                 }).join('')}
               </select>
@@ -318,8 +321,8 @@ class LovelaceTrackHistoryCard extends HTMLElement {
               <label>${this._t('date')}</label>
               <div class="date-nav">
                 <button type="button" class="date-nav-btn" id="date-prev">&#8249;</button>
-                <input type="date" id="date-picker" value="${today}" max="${today}" />
-                <button type="button" class="date-nav-btn" id="date-next" ${today === today ? 'disabled' : ''}>&#8250;</button>
+                <input type="date" id="date-picker" value="${selDate}" max="${today}" />
+                <button type="button" class="date-nav-btn" id="date-next" ${selDate >= today ? 'disabled' : ''}>&#8250;</button>
               </div>
             </div>
           </div>
@@ -335,28 +338,31 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     `;
 
     this.shadowRoot.getElementById('entity-select')
-      .addEventListener('change', () => this._onLoad());
+      .addEventListener('change', e => {
+        this._selectedEntity = e.target.value;
+        this._onLoad();
+      });
 
     const datePicker = this.shadowRoot.getElementById('date-picker');
     const dateNext   = this.shadowRoot.getElementById('date-next');
-    datePicker.addEventListener('change', () => {
+    const applyDate  = () => {
+      this._selectedDate = datePicker.value;
       dateNext.disabled = datePicker.value >= today;
       this._onLoad();
-    });
+    };
+    datePicker.addEventListener('change', applyDate);
     this.shadowRoot.getElementById('date-prev')
       .addEventListener('click', () => {
         const d = new Date(datePicker.value + 'T12:00:00');
         d.setDate(d.getDate() - 1);
         datePicker.value = d.toISOString().slice(0, 10);
-        dateNext.disabled = false;
-        this._onLoad();
+        applyDate();
       });
     dateNext.addEventListener('click', () => {
       const d = new Date(datePicker.value + 'T12:00:00');
       d.setDate(d.getDate() + 1);
       datePicker.value = d.toISOString().slice(0, 10);
-      dateNext.disabled = datePicker.value >= today;
-      this._onLoad();
+      applyDate();
     });
   }
 
