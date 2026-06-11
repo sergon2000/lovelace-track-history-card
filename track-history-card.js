@@ -1119,16 +1119,6 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
 
         <div class="check-row">
           <label class="check-label">
-            <input type="checkbox" id="title-check" ${hasTitle ? 'checked' : ''}>
-            <span>${this._t('title_lbl')}</span>
-          </label>
-          <input type="text" id="f-title" class="text-input"
-            placeholder="${this._t('default_title')}" value="${titleValue}"
-            style="display:${hasTitle ? 'block' : 'none'}">
-        </div>
-
-        <div class="check-row">
-          <label class="check-label">
             <input type="checkbox" id="default-check" ${hasDefault ? 'checked' : ''}>
             <span>${this._t('default_dev')}</span>
           </label>
@@ -1143,6 +1133,23 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           ` : ''}
         </div>
 
+        <div class="check-row">
+          <label class="check-label">
+            <input type="checkbox" id="title-check" ${hasTitle ? 'checked' : ''}>
+            <span>${this._t('title_lbl')}</span>
+          </label>
+          <input type="text" id="f-title" class="text-input"
+            placeholder="${this._t('default_title')}" value="${titleValue}"
+            style="display:${hasTitle ? 'block' : 'none'}">
+        </div>
+
+        <div>
+          <label class="check-label">
+            <input type="checkbox" id="timeline-check" ${showTimeline ? 'checked' : ''}>
+            <span>${this._t('timeline_lbl')}</span>
+          </label>
+        </div>
+
         <div>
           <div class="section-label">${this._t('theme_lbl')}</div>
           <div class="radio-group">
@@ -1152,13 +1159,6 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
                 <span>${this._t('theme_' + v)}</span>
               </label>`).join('')}
           </div>
-        </div>
-
-        <div>
-          <label class="check-label">
-            <input type="checkbox" id="timeline-check" ${showTimeline ? 'checked' : ''}>
-            <span>${this._t('timeline_lbl')}</span>
-          </label>
         </div>
 
         <details class="advanced">
