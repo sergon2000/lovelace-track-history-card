@@ -573,6 +573,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       no_attributes: false,
     });
 
+    console.info('[track-history] WS range %s … %s | keys=%o | raw=%d', startISO, endISO,
+      result && Object.keys(result), (result?.[entityId] ?? []).length, result);
+
     const list = result?.[entityId] ?? [];
     let lastA = {};
     return list
