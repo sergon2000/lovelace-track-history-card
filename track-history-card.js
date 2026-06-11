@@ -674,12 +674,21 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       if (p.stopRole === 'mid') this._clusterMarker(L, p).addTo(this._map);
     });
 
-    // Start marker (green) — initial derived from the localized "start" label
-    this._pinMarker(L, displayed[0], '#2E7D32', this._initial('start'), this._t('start')).addTo(this._map);
+    // Start/end markers. If both fall within the cluster radius (e.g. a day
+    // that starts and ends at home) they'd overlap, so draw a single combined
+    // half-green/half-red marker instead.
+    const startP = displayed[0];
+    const endP   = displayed[displayed.length - 1];
+    const sameZone = displayed.length > 1
+      && this._haversine(startP, endP) * 1000 <= (this._config.cluster_radius || 100);
 
-    // End marker (red) — only if more than one point
-    if (displayed.length > 1) {
-      this._pinMarker(L, displayed[displayed.length - 1], '#C62828', this._initial('end'), this._t('end')).addTo(this._map);
+    if (sameZone) {
+      this._startEndMarker(L, startP, endP).addTo(this._map);
+    } else {
+      this._pinMarker(L, startP, '#2E7D32', this._initial('start'), this._t('start')).addTo(this._map);
+      if (displayed.length > 1) {
+        this._pinMarker(L, endP, '#C62828', this._initial('end'), this._t('end')).addTo(this._map);
+      }
     }
 
     this._map.fitBounds(L.latLngBounds(latlngs), { padding: [32, 32], animate: false });
@@ -705,6 +714,34 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     });
     return L.marker([point.lat, point.lng], { icon })
       .bindPopup(this._popupHtml(point, label));
+  }
+
+  _startEndMarker(L, startP, endP) {
+    const fmt = t => t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const i1 = this._initial('start');
+    const i2 = this._initial('end');
+    const icon = L.divIcon({
+      html: `<div style="
+        width:30px;height:30px;border-radius:50%;
+        background:linear-gradient(90deg,#2E7D32 0 50%,#C62828 50% 100%);
+        color:#fff;display:flex;align-items:center;justify-content:center;
+        font-size:10px;font-weight:700;
+        border:2px solid rgba(255,255,255,.9);
+        box-shadow:0 2px 6px rgba(0,0,0,.35);
+      ">${i1}/${i2}</div>`,
+      className: '',
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+      popupAnchor: [0, -16],
+    });
+    const popup = `
+      <div style="min-width:120px">
+        <strong>${this._t('start')}</strong> 🕐 ${fmt(startP.time)}<br>
+        <strong>${this._t('end')}</strong> 🕐 ${fmt(endP.timeTo ?? endP.time)}
+      </div>`;
+    // Place it at the midpoint so it sits between the two coincident points.
+    const mid = [(startP.lat + endP.lat) / 2, (startP.lng + endP.lng) / 2];
+    return L.marker(mid, { icon }).bindPopup(popup);
   }
 
   _popupHtml(point, label = '') {
