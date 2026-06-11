@@ -282,10 +282,6 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return TRANSLATIONS[getLang(this._hass)][key];
   }
 
-  _initial(key) {
-    return (this._t(key) || '').charAt(0).toUpperCase();
-  }
-
   disconnectedCallback() {
     this._destroyMap();
   }
@@ -674,19 +670,28 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       if (p.stopRole === 'mid') this._clusterMarker(L, p).addTo(this._map);
     });
 
-    // Start marker (green) — initial derived from the localized "start" label
-    this._pinMarker(L, displayed[0], '#2E7D32', this._initial('start'), this._t('start')).addTo(this._map);
+    // Start/end markers. If both fall within the cluster radius (e.g. a day
+    // that starts and ends at home) they'd overlap, so draw a single combined
+    // half-green/half-red marker instead.
+    const startP = displayed[0];
+    const endP   = displayed[displayed.length - 1];
+    const sameZone = displayed.length > 1
+      && this._haversine(startP, endP) * 1000 <= (this._config.cluster_radius || 100);
 
-    // End marker (red) — only if more than one point
-    if (displayed.length > 1) {
-      this._pinMarker(L, displayed[displayed.length - 1], '#C62828', this._initial('end'), this._t('end')).addTo(this._map);
+    if (sameZone) {
+      this._startEndMarker(L, startP, endP).addTo(this._map);
+    } else {
+      this._pinMarker(L, startP, '#2E7D32', '', this._t('start'), 'start').addTo(this._map);
+      if (displayed.length > 1) {
+        this._pinMarker(L, endP, '#C62828', '', this._t('end'), 'end').addTo(this._map);
+      }
     }
 
     this._map.fitBounds(L.latLngBounds(latlngs), { padding: [32, 32], animate: false });
     return displayed;
   }
 
-  _pinMarker(L, point, color, letter, label) {
+  _pinMarker(L, point, color, letter, label, role = '') {
     const icon = L.divIcon({
       html: `
         <div style="
@@ -704,12 +709,42 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       popupAnchor: [0, -28],
     });
     return L.marker([point.lat, point.lng], { icon })
-      .bindPopup(this._popupHtml(point, label));
+      .bindPopup(this._popupHtml(point, label, role));
   }
 
-  _popupHtml(point, label = '') {
+  _startEndMarker(L, startP, endP) {
     const fmt = t => t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const timeHtml = point.count > 1
+    const icon = L.divIcon({
+      html: `<div style="
+        width:26px;height:26px;border-radius:50%;
+        background:linear-gradient(90deg,#2E7D32 0 50%,#C62828 50% 100%);
+        border:2px solid rgba(255,255,255,.9);
+        box-shadow:0 2px 6px rgba(0,0,0,.35);
+      "></div>`,
+      className: '',
+      iconSize: [26, 26],
+      iconAnchor: [13, 13],
+      popupAnchor: [0, -16],
+    });
+    const popup = `
+      <div style="min-width:120px">
+        <strong>${this._t('start')}</strong> 🕐 ${fmt(startP.timeTo ?? startP.time)}<br>
+        <strong>${this._t('end')}</strong> 🕐 ${fmt(endP.time)}
+      </div>`;
+    // Place it at the midpoint so it sits between the two coincident points.
+    const mid = [(startP.lat + endP.lat) / 2, (startP.lng + endP.lng) / 2];
+    return L.marker(mid, { icon }).bindPopup(popup);
+  }
+
+  _popupHtml(point, label = '', role = '') {
+    const fmt = t => t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // Start stop → departure time (last point); end stop → arrival time
+    // (first point); other stops → the full arrival–departure range.
+    const timeHtml = role === 'start'
+      ? `🕐 ${fmt(point.timeTo ?? point.time)}`
+      : role === 'end'
+      ? `🕐 ${fmt(point.time)}`
+      : point.count > 1
       ? `🕐 ${fmt(point.time)} – ${fmt(point.timeTo)}`
       : `🕐 ${fmt(point.time)}`;
     const acc = (!point.count || point.count === 1) && point.accuracy
@@ -852,12 +887,17 @@ class LovelaceTrackHistoryCard extends HTMLElement {
           : it.role === 'end' ? this._t('end')
           : `${this._t('stop_n')} ${it.n}`;
         const icon = it.role === 'start' ? '🟢' : it.role === 'end' ? '🔴' : '📍';
+        // Start → departure (last point); end → arrival (first point);
+        // other stops → the full arrival–departure range.
+        const timeStr = it.role === 'start' ? `🕐 ${fmt(it.timeTo)}`
+          : it.role === 'end' ? `🕐 ${fmt(it.time)}`
+          : `🕐 ${fmt(it.time)} – ${fmt(it.timeTo)}`;
         return `
           <div class="tl-item">
             <div class="tl-icon">${icon}</div>
             <div class="tl-body">
               <div class="tl-title">${title}</div>
-              <div class="tl-sub">🕐 ${fmt(it.time)} – ${fmt(it.timeTo)}</div>
+              <div class="tl-sub">${timeStr}</div>
             </div>
           </div>`;
       }
