@@ -681,9 +681,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     if (sameZone) {
       this._startEndMarker(L, startP, endP).addTo(this._map);
     } else {
-      this._pinMarker(L, startP, '#2E7D32', '', this._t('start')).addTo(this._map);
+      this._pinMarker(L, startP, '#2E7D32', '', this._t('start'), 'start').addTo(this._map);
       if (displayed.length > 1) {
-        this._pinMarker(L, endP, '#C62828', '', this._t('end')).addTo(this._map);
+        this._pinMarker(L, endP, '#C62828', '', this._t('end'), 'end').addTo(this._map);
       }
     }
 
@@ -691,7 +691,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return displayed;
   }
 
-  _pinMarker(L, point, color, letter, label) {
+  _pinMarker(L, point, color, letter, label, role = '') {
     const icon = L.divIcon({
       html: `
         <div style="
@@ -709,7 +709,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       popupAnchor: [0, -28],
     });
     return L.marker([point.lat, point.lng], { icon })
-      .bindPopup(this._popupHtml(point, label));
+      .bindPopup(this._popupHtml(point, label, role));
   }
 
   _startEndMarker(L, startP, endP) {
@@ -728,17 +728,23 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     });
     const popup = `
       <div style="min-width:120px">
-        <strong>${this._t('start')}</strong> 🕐 ${fmt(startP.time)}<br>
-        <strong>${this._t('end')}</strong> 🕐 ${fmt(endP.timeTo ?? endP.time)}
+        <strong>${this._t('start')}</strong> 🕐 ${fmt(startP.timeTo ?? startP.time)}<br>
+        <strong>${this._t('end')}</strong> 🕐 ${fmt(endP.time)}
       </div>`;
     // Place it at the midpoint so it sits between the two coincident points.
     const mid = [(startP.lat + endP.lat) / 2, (startP.lng + endP.lng) / 2];
     return L.marker(mid, { icon }).bindPopup(popup);
   }
 
-  _popupHtml(point, label = '') {
+  _popupHtml(point, label = '', role = '') {
     const fmt = t => t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const timeHtml = point.count > 1
+    // Start stop → departure time (last point); end stop → arrival time
+    // (first point); other stops → the full arrival–departure range.
+    const timeHtml = role === 'start'
+      ? `🕐 ${fmt(point.timeTo ?? point.time)}`
+      : role === 'end'
+      ? `🕐 ${fmt(point.time)}`
+      : point.count > 1
       ? `🕐 ${fmt(point.time)} – ${fmt(point.timeTo)}`
       : `🕐 ${fmt(point.time)}`;
     const acc = (!point.count || point.count === 1) && point.accuracy
@@ -881,12 +887,17 @@ class LovelaceTrackHistoryCard extends HTMLElement {
           : it.role === 'end' ? this._t('end')
           : `${this._t('stop_n')} ${it.n}`;
         const icon = it.role === 'start' ? '🟢' : it.role === 'end' ? '🔴' : '📍';
+        // Start → departure (last point); end → arrival (first point);
+        // other stops → the full arrival–departure range.
+        const timeStr = it.role === 'start' ? `🕐 ${fmt(it.timeTo)}`
+          : it.role === 'end' ? `🕐 ${fmt(it.time)}`
+          : `🕐 ${fmt(it.time)} – ${fmt(it.timeTo)}`;
         return `
           <div class="tl-item">
             <div class="tl-icon">${icon}</div>
             <div class="tl-body">
               <div class="tl-title">${title}</div>
-              <div class="tl-sub">🕐 ${fmt(it.time)} – ${fmt(it.timeTo)}</div>
+              <div class="tl-sub">${timeStr}</div>
             </div>
           </div>`;
       }
