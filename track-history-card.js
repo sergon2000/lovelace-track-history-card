@@ -610,6 +610,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     }
 
     const displayed = this._clusterPoints(points, this._config.cluster_radius, this._config.min_points);
+    this._numberStops(displayed);
     const latlngs   = displayed.map(p => [p.lat, p.lng]);
 
     // Main track polyline — geometry smoothed with a Catmull-Rom spline so
@@ -620,15 +621,11 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     }).addTo(this._map);
     this._addArrows(L, latlngs);
 
-    // Cluster markers only. Single in-transit points are not marked — the
-    // device is just passing through, so the polyline alone represents them.
-    if (displayed.length > 2) {
-      displayed.slice(1, -1).forEach(p => {
-        if (p.count > 1) {
-          this._clusterMarker(L, p).addTo(this._map);
-        }
-      });
-    }
+    // Intermediate stop markers, numbered. The first/last stops get the
+    // green/end pins below; in-transit points are represented by the line only.
+    displayed.forEach(p => {
+      if (p.stopRole === 'mid') this._clusterMarker(L, p).addTo(this._map);
+    });
 
     // Start marker (green) — initial derived from the localized "start" label
     this._pinMarker(L, displayed[0], '#2E7D32', this._initial('start'), this._t('start')).addTo(this._map);
@@ -681,6 +678,15 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       </div>`;
   }
 
+  _numberStops(displayed) {
+    const clusters = displayed.filter(p => p.count > 1);
+    clusters.forEach((p, k) => {
+      if (k === 0) p.stopRole = 'start';
+      else if (k === clusters.length - 1) p.stopRole = 'end';
+      else { p.stopRole = 'mid'; p.stopNo = k; }
+    });
+  }
+
   _clusterMarker(L, point) {
     const icon = L.divIcon({
       html: `<div style="
@@ -690,7 +696,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         font-size:11px;font-weight:700;
         border:2px solid rgba(255,255,255,.9);
         box-shadow:0 2px 6px rgba(0,0,0,.3);
-      ">${point.count}</div>`,
+      ">${point.stopNo}</div>`,
       className: '',
       iconSize: [28, 28],
       iconAnchor: [14, 14],
@@ -839,8 +845,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
     stops.forEach((idx, s) => {
       const p = displayed[idx];
-      const role = s === 0 ? 'start' : (s === stops.length - 1 ? 'end' : 'mid');
-      items.push({ type: 'stop', n: s + 1, role, time: p.time, timeTo: p.timeTo });
+      items.push({ type: 'stop', n: p.stopNo, role: p.stopRole, time: p.time, timeTo: p.timeTo });
       if (s < stops.length - 1) items.push({ type: 'move', dist: segDist(idx, stops[s + 1]) });
     });
 
