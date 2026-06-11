@@ -547,30 +547,44 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   async _fetchPoints(entityId, date) {
-    const start = `${date}T00:00:00`;
-    const end   = `${date}T23:59:59`;
+    // Local day boundaries → explicit UTC instants for the API.
+    const startISO = new Date(`${date}T00:00:00`).toISOString();
+    const endISO   = new Date(`${date}T23:59:59`).toISOString();
 
-    // NOTE: HA evaluates `minimal_response` and `no_attributes` by *presence*,
-    // not value — passing `=false` still activates them and strips attributes.
-    // `significant_changes_only=0` is required to get every GPS update, not
-    // just zone-transition state changes.
-    const result = await this._hass.callApi(
-      'GET',
-      `history/period/${start}` +
-        `?filter_entity_id=${encodeURIComponent(entityId)}` +
-        `&end_time=${encodeURIComponent(end)}` +
-        `&significant_changes_only=0`
-    );
+    // Use the WebSocket history API (history_during_period) — the same one the
+    // HA History panel uses. The REST `history/period` endpoint returns []
+    // for fully past days in many setups, while this one returns them
+    // correctly. minimal_response/no_attributes must be false to keep GPS
+    // attributes; significant_changes_only false to get every update.
+    const result = await this._hass.callWS({
+      type: 'history/history_during_period',
+      start_time: startISO,
+      end_time: endISO,
+      entity_ids: [entityId],
+      significant_changes_only: false,
+      minimal_response: false,
+      no_attributes: false,
+    });
 
-    return (result?.[0] ?? [])
-      .filter(s => s.attributes?.latitude != null && s.attributes?.longitude != null)
-      .map(s => ({
-        lat:      parseFloat(s.attributes.latitude),
-        lng:      parseFloat(s.attributes.longitude),
-        accuracy: s.attributes.gps_accuracy ?? 0,
-        time:     new Date(s.last_changed),
-        state:    s.state,
-      }));
+    const list = result?.[entityId] ?? [];
+    let lastA = {};
+    return list
+      .map(s => {
+        // Compact WS keys: s=state, a=attributes, lu=last_updated,
+        // lc=last_changed (epoch seconds). Attributes carry forward when
+        // unchanged. Fall back to verbose keys for older HA versions.
+        const a = s.a ?? s.attributes;
+        if (a) lastA = { ...lastA, ...a };
+        const t = s.lu ?? s.lc ?? s.last_updated ?? s.last_changed;
+        return {
+          lat:      lastA.latitude != null ? parseFloat(lastA.latitude) : null,
+          lng:      lastA.longitude != null ? parseFloat(lastA.longitude) : null,
+          accuracy: lastA.gps_accuracy ?? 0,
+          time:     typeof t === 'number' ? new Date(t * 1000) : new Date(t),
+          state:    s.s ?? s.state,
+        };
+      })
+      .filter(p => p.lat != null && p.lng != null);
   }
 
   // ── Map rendering ─────────────────────────────────────────────────────────
