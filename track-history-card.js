@@ -45,6 +45,9 @@ const TRANSLATIONS = {
     theme_light:       'Light',
     theme_dark:        'Dark',
     advanced_lbl:      'Advanced',
+    timeline_lbl:      'Timeline',
+    stop_n:            'Stop',
+    moving:            'Moving',
     default_title:     'Track History',
   },
   es: {
@@ -72,6 +75,9 @@ const TRANSLATIONS = {
     theme_light:       'Claro',
     theme_dark:        'Oscuro',
     advanced_lbl:      'Avanzado',
+    timeline_lbl:      'Cronología',
+    stop_n:            'Parada',
+    moving:            'En movimiento',
     default_title:     'Track History',
   },
   fr: {
@@ -99,6 +105,9 @@ const TRANSLATIONS = {
     theme_light:       'Clair',
     theme_dark:        'Sombre',
     advanced_lbl:      'Avancé',
+    timeline_lbl:      'Chronologie',
+    stop_n:            'Arrêt',
+    moving:            'En mouvement',
     default_title:     'Track History',
   },
   de: {
@@ -126,6 +135,9 @@ const TRANSLATIONS = {
     theme_light:       'Hell',
     theme_dark:        'Dunkel',
     advanced_lbl:      'Erweitert',
+    timeline_lbl:      'Zeitleiste',
+    stop_n:            'Halt',
+    moving:            'In Bewegung',
     default_title:     'Track History',
   },
   it: {
@@ -153,6 +165,9 @@ const TRANSLATIONS = {
     theme_light:       'Chiaro',
     theme_dark:        'Scuro',
     advanced_lbl:      'Avanzate',
+    timeline_lbl:      'Cronologia',
+    stop_n:            'Sosta',
+    moving:            'In movimento',
     default_title:     'Track History',
   },
   pt: {
@@ -180,6 +195,9 @@ const TRANSLATIONS = {
     theme_light:       'Claro',
     theme_dark:        'Escuro',
     advanced_lbl:      'Avançado',
+    timeline_lbl:      'Cronologia',
+    stop_n:            'Paragem',
+    moving:            'Em movimento',
     default_title:     'Track History',
   },
 };
@@ -264,6 +282,10 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return TRANSLATIONS[getLang(this._hass)][key];
   }
 
+  _initial(key) {
+    return (this._t(key) || '').charAt(0).toUpperCase();
+  }
+
   disconnectedCallback() {
     this._destroyMap();
   }
@@ -273,6 +295,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   _build() {
     const today = new Date().toISOString().split('T')[0];
     const h = this._config.map_height;
+    // Preserve the selected date/device across rebuilds (e.g. editor changes).
+    const selDate   = this._selectedDate || today;
+    const selEntity = this._selectedEntity || this._config.default_entity;
 
     this.shadowRoot.innerHTML = `
       <style>${this._css(h)}</style>
@@ -287,7 +312,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
                 ${this._config.entities.map(e => {
                   const label = this._hass?.states[e]?.attributes?.friendly_name
                     || e.replace('device_tracker.', '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                  const selected = e === this._config.default_entity ? ' selected' : '';
+                  const selected = e === selEntity ? ' selected' : '';
                   return `<option value="${e}"${selected}>${label}</option>`;
                 }).join('')}
               </select>
@@ -296,8 +321,8 @@ class LovelaceTrackHistoryCard extends HTMLElement {
               <label>${this._t('date')}</label>
               <div class="date-nav">
                 <button type="button" class="date-nav-btn" id="date-prev">&#8249;</button>
-                <input type="date" id="date-picker" value="${today}" max="${today}" />
-                <button type="button" class="date-nav-btn" id="date-next" ${today === today ? 'disabled' : ''}>&#8250;</button>
+                <input type="date" id="date-picker" value="${selDate}" max="${today}" />
+                <button type="button" class="date-nav-btn" id="date-next" ${selDate >= today ? 'disabled' : ''}>&#8250;</button>
               </div>
             </div>
           </div>
@@ -307,33 +332,37 @@ class LovelaceTrackHistoryCard extends HTMLElement {
             <div id="no-data" class="no-data hidden">${this._t('no_data')}</div>
           </div>
           <div id="summary" class="summary hidden"></div>
+          <div id="timeline" class="timeline hidden"></div>
         </div>
       </ha-card>
     `;
 
     this.shadowRoot.getElementById('entity-select')
-      .addEventListener('change', () => this._onLoad());
+      .addEventListener('change', e => {
+        this._selectedEntity = e.target.value;
+        this._onLoad();
+      });
 
     const datePicker = this.shadowRoot.getElementById('date-picker');
     const dateNext   = this.shadowRoot.getElementById('date-next');
-    datePicker.addEventListener('change', () => {
+    const applyDate  = () => {
+      this._selectedDate = datePicker.value;
       dateNext.disabled = datePicker.value >= today;
       this._onLoad();
-    });
+    };
+    datePicker.addEventListener('change', applyDate);
     this.shadowRoot.getElementById('date-prev')
       .addEventListener('click', () => {
         const d = new Date(datePicker.value + 'T12:00:00');
         d.setDate(d.getDate() - 1);
         datePicker.value = d.toISOString().slice(0, 10);
-        dateNext.disabled = false;
-        this._onLoad();
+        applyDate();
       });
     dateNext.addEventListener('click', () => {
       const d = new Date(datePicker.value + 'T12:00:00');
       d.setDate(d.getDate() + 1);
       datePicker.value = d.toISOString().slice(0, 10);
-      dateNext.disabled = datePicker.value >= today;
-      this._onLoad();
+      applyDate();
     });
   }
 
@@ -448,6 +477,44 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       }
       .summary-item { display: flex; align-items: center; gap: 5px; }
 
+      /* Timeline panel */
+      .timeline {
+        margin-top: 14px;
+        border-top: 1px solid var(--divider-color, #e0e0e0);
+        padding-top: 12px;
+      }
+      .tl-header {
+        font-size: 11px;
+        font-weight: 500;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--secondary-text-color, #888);
+        margin-bottom: 10px;
+      }
+      .tl-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        font-size: 13px;
+        color: var(--primary-text-color, #333);
+      }
+      .tl-icon {
+        flex-shrink: 0;
+        width: 22px;
+        text-align: center;
+        line-height: 1.5;
+      }
+      .tl-body { flex: 1; padding-bottom: 10px; }
+      .tl-title { font-weight: 500; }
+      .tl-sub {
+        font-size: 12px;
+        color: var(--secondary-text-color, #888);
+      }
+      .tl-move {
+        color: var(--secondary-text-color, #888);
+        font-style: italic;
+      }
+
       /* Leaflet popup override */
       .leaflet-popup-content { font-size: 13px; line-height: 1.5; }
     `;
@@ -462,6 +529,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
     this._setAlert('');
     this._setSummary(null);
+    this._setTimeline(null);
     this._setNoData(false);
 
     try {
@@ -474,8 +542,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         this._setNoData(true);
       } else {
         this._setNoData(false);
-        this._drawTrack(L, points);
+        const displayed = this._drawTrack(L, points);
         this._setSummary(points);
+        this._setTimeline(displayed);
       }
     } catch (err) {
       console.error('[lovelace-track-history-card]', err);
@@ -484,30 +553,68 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   async _fetchPoints(entityId, date) {
-    const start = `${date}T00:00:00`;
-    const end   = `${date}T23:59:59`;
+    // Local day boundaries → explicit UTC instants for the API.
+    const startISO = new Date(`${date}T00:00:00`).toISOString();
+    const endISO   = new Date(`${date}T23:59:59.999`).toISOString();
 
-    // NOTE: HA evaluates `minimal_response` and `no_attributes` by *presence*,
-    // not value — passing `=false` still activates them and strips attributes.
-    // `significant_changes_only=0` is required to get every GPS update, not
-    // just zone-transition state changes.
-    const result = await this._hass.callApi(
-      'GET',
-      `history/period/${start}` +
-        `?filter_entity_id=${encodeURIComponent(entityId)}` +
-        `&end_time=${encodeURIComponent(end)}` +
-        `&significant_changes_only=0`
-    );
+    // Use the `history/stream` WS subscription — the same one the HA History
+    // panel uses. The REST `history/period` endpoint and the one-shot
+    // `history/history_during_period` command both return empty for fully past
+    // days in recent HA versions; `history/stream` returns them correctly.
+    const list = await this._streamHistory(entityId, startISO, endISO);
 
-    return (result?.[0] ?? [])
-      .filter(s => s.attributes?.latitude != null && s.attributes?.longitude != null)
-      .map(s => ({
-        lat:      parseFloat(s.attributes.latitude),
-        lng:      parseFloat(s.attributes.longitude),
-        accuracy: s.attributes.gps_accuracy ?? 0,
-        time:     new Date(s.last_changed),
-        state:    s.state,
-      }));
+    let lastA = {};
+    return list
+      .map(s => {
+        // Compact keys: s=state, a=attributes, lu=last_updated,
+        // lc=last_changed (epoch seconds). Attributes carry forward when
+        // unchanged. Verbose keys are a fallback for older HA versions.
+        const a = s.a ?? s.attributes;
+        if (a) lastA = { ...lastA, ...a };
+        const t = s.lu ?? s.lc ?? s.last_updated ?? s.last_changed;
+        return {
+          lat:      lastA.latitude != null ? parseFloat(lastA.latitude) : null,
+          lng:      lastA.longitude != null ? parseFloat(lastA.longitude) : null,
+          accuracy: lastA.gps_accuracy ?? 0,
+          time:     typeof t === 'number' ? new Date(t * 1000) : new Date(t),
+          state:    s.s ?? s.state,
+        };
+      })
+      .filter(p => p.lat != null && p.lng != null);
+  }
+
+  _streamHistory(entityId, startISO, endISO) {
+    // `history/stream` is a subscription: the first event carries the initial
+    // history, followed by live updates. We take that first event and
+    // unsubscribe immediately.
+    return new Promise((resolve, reject) => {
+      let unsub = null;
+      let done = false;
+      const finish = (val) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (unsub) { try { unsub(); } catch (_) { /* ignore */ } }
+        resolve(val);
+      };
+      const timer = setTimeout(() => finish([]), 15000);
+
+      this._hass.connection.subscribeMessage(
+        (msg) => { if (msg && msg.states) finish(msg.states[entityId] ?? []); },
+        {
+          type: 'history/stream',
+          entity_ids: [entityId],
+          start_time: startISO,
+          end_time: endISO,
+          minimal_response: false,
+          no_attributes: false,
+          significant_changes_only: false,
+        }
+      ).then((u) => {
+        unsub = u;
+        if (done) { try { u(); } catch (_) { /* ignore */ } }
+      }).catch(reject);
+    });
   }
 
   // ── Map rendering ─────────────────────────────────────────────────────────
@@ -547,6 +654,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     }
 
     const displayed = this._clusterPoints(points, this._config.cluster_radius, this._config.min_points);
+    this._numberStops(displayed);
     const latlngs   = displayed.map(p => [p.lat, p.lng]);
 
     // Main track polyline — geometry smoothed with a Catmull-Rom spline so
@@ -557,25 +665,22 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     }).addTo(this._map);
     this._addArrows(L, latlngs);
 
-    // Cluster markers only. Single in-transit points are not marked — the
-    // device is just passing through, so the polyline alone represents them.
-    if (displayed.length > 2) {
-      displayed.slice(1, -1).forEach(p => {
-        if (p.count > 1) {
-          this._clusterMarker(L, p).addTo(this._map);
-        }
-      });
-    }
+    // Intermediate stop markers, numbered. The first/last stops get the
+    // green/end pins below; in-transit points are represented by the line only.
+    displayed.forEach(p => {
+      if (p.stopRole === 'mid') this._clusterMarker(L, p).addTo(this._map);
+    });
 
-    // Start marker (green)
-    this._pinMarker(L, displayed[0], '#2E7D32', 'S', this._t('start')).addTo(this._map);
+    // Start marker (green) — initial derived from the localized "start" label
+    this._pinMarker(L, displayed[0], '#2E7D32', this._initial('start'), this._t('start')).addTo(this._map);
 
     // End marker (red) — only if more than one point
     if (displayed.length > 1) {
-      this._pinMarker(L, displayed[displayed.length - 1], '#C62828', 'E', this._t('end')).addTo(this._map);
+      this._pinMarker(L, displayed[displayed.length - 1], '#C62828', this._initial('end'), this._t('end')).addTo(this._map);
     }
 
     this._map.fitBounds(L.latLngBounds(latlngs), { padding: [32, 32], animate: false });
+    return displayed;
   }
 
   _pinMarker(L, point, color, letter, label) {
@@ -617,6 +722,15 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       </div>`;
   }
 
+  _numberStops(displayed) {
+    const clusters = displayed.filter(p => p.count > 1);
+    clusters.forEach((p, k) => {
+      if (k === 0) p.stopRole = 'start';
+      else if (k === clusters.length - 1) p.stopRole = 'end';
+      else { p.stopRole = 'mid'; p.stopNo = k; }
+    });
+  }
+
   _clusterMarker(L, point) {
     const icon = L.divIcon({
       html: `<div style="
@@ -626,7 +740,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         font-size:11px;font-weight:700;
         border:2px solid rgba(255,255,255,.9);
         box-shadow:0 2px 6px rgba(0,0,0,.3);
-      ">${point.count}</div>`,
+      ">${point.stopNo}</div>`,
       className: '',
       iconSize: [28, 28],
       iconAnchor: [14, 14],
@@ -718,6 +832,76 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       <span class="summary-item">📏 ~${km} km</span>
     `;
     el.className = 'summary';
+  }
+
+  _setTimeline(displayed) {
+    const el = this.shadowRoot.getElementById('timeline');
+    if (!el) return;
+    if (!displayed || !this._config.show_timeline) { el.className = 'timeline hidden'; return; }
+
+    const items = this._buildTimeline(displayed);
+    if (items.length === 0) { el.className = 'timeline hidden'; return; }
+
+    const fmt = t => t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const rows = items.map(it => {
+      if (it.type === 'stop') {
+        const title = it.role === 'start' ? this._t('start')
+          : it.role === 'end' ? this._t('end')
+          : `${this._t('stop_n')} ${it.n}`;
+        const icon = it.role === 'start' ? '🟢' : it.role === 'end' ? '🔴' : '📍';
+        return `
+          <div class="tl-item">
+            <div class="tl-icon">${icon}</div>
+            <div class="tl-body">
+              <div class="tl-title">${title}</div>
+              <div class="tl-sub">🕐 ${fmt(it.time)} – ${fmt(it.timeTo)}</div>
+            </div>
+          </div>`;
+      }
+      return `
+        <div class="tl-item">
+          <div class="tl-icon">↓</div>
+          <div class="tl-body tl-move">${this._t('moving')} · ~${this._fmtDist(it.dist)}</div>
+        </div>`;
+    }).join('');
+
+    el.innerHTML = `<div class="tl-header">${this._t('timeline_lbl')}</div>${rows}`;
+    el.className = 'timeline';
+  }
+
+  _buildTimeline(displayed) {
+    const segDist = (from, to) => {
+      let d = 0;
+      for (let k = from; k < to; k++) d += this._haversine(displayed[k], displayed[k + 1]);
+      return d; // km
+    };
+    const stops = [];
+    displayed.forEach((p, i) => { if (p.count > 1) stops.push(i); });
+
+    const items = [];
+    if (stops.length === 0) {
+      if (displayed.length > 1) items.push({ type: 'move', dist: segDist(0, displayed.length - 1) });
+      return items;
+    }
+
+    // Movement before the first stop
+    if (stops[0] > 0) items.push({ type: 'move', dist: segDist(0, stops[0]) });
+
+    stops.forEach((idx, s) => {
+      const p = displayed[idx];
+      items.push({ type: 'stop', n: p.stopNo, role: p.stopRole, time: p.time, timeTo: p.timeTo });
+      if (s < stops.length - 1) items.push({ type: 'move', dist: segDist(idx, stops[s + 1]) });
+    });
+
+    // Movement after the last stop
+    const last = stops[stops.length - 1];
+    if (last < displayed.length - 1) items.push({ type: 'move', dist: segDist(last, displayed.length - 1) });
+
+    return items;
+  }
+
+  _fmtDist(km) {
+    return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
   }
 
   // ── Leaflet CSS injection ─────────────────────────────────────────────────
@@ -852,6 +1036,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     const clusterRadius = this._config.cluster_radius ?? 100;
     const minPoints     = this._config.min_points ?? 3;
     const themeValue    = this._config.theme || 'system';
+    const showTimeline  = !!this._config.show_timeline;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -978,16 +1163,6 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
 
         <div class="check-row">
           <label class="check-label">
-            <input type="checkbox" id="title-check" ${hasTitle ? 'checked' : ''}>
-            <span>${this._t('title_lbl')}</span>
-          </label>
-          <input type="text" id="f-title" class="text-input"
-            placeholder="${this._t('default_title')}" value="${titleValue}"
-            style="display:${hasTitle ? 'block' : 'none'}">
-        </div>
-
-        <div class="check-row">
-          <label class="check-label">
             <input type="checkbox" id="default-check" ${hasDefault ? 'checked' : ''}>
             <span>${this._t('default_dev')}</span>
           </label>
@@ -1000,6 +1175,23 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
                 </option>`).join('')}
             </select>
           ` : ''}
+        </div>
+
+        <div class="check-row">
+          <label class="check-label">
+            <input type="checkbox" id="title-check" ${hasTitle ? 'checked' : ''}>
+            <span>${this._t('title_lbl')}</span>
+          </label>
+          <input type="text" id="f-title" class="text-input"
+            placeholder="${this._t('default_title')}" value="${titleValue}"
+            style="display:${hasTitle ? 'block' : 'none'}">
+        </div>
+
+        <div>
+          <label class="check-label">
+            <input type="checkbox" id="timeline-check" ${showTimeline ? 'checked' : ''}>
+            <span>${this._t('timeline_lbl')}</span>
+          </label>
         </div>
 
         <div>
@@ -1071,6 +1263,9 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
       .forEach(r => r.addEventListener('change', e => {
         if (e.target.checked) this._set('theme', e.target.value);
       }));
+
+    this.shadowRoot.getElementById('timeline-check')
+      .addEventListener('change', e => this._set('show_timeline', e.target.checked ? true : null));
 
     this.shadowRoot.getElementById('f-cluster-radius')
       .addEventListener('change', e => {
