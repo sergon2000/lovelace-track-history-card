@@ -1074,6 +1074,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     this._config = {};
     this._hass = null;
     this._showTitle = false;
+    this._advancedOpen = false;
   }
 
   setConfig(config) {
@@ -1275,7 +1276,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           </div>
         </div>
 
-        <details class="advanced">
+        <details class="advanced" id="advanced" ${this._advancedOpen ? 'open' : ''}>
           <summary>${this._t('advanced_lbl')}</summary>
           <div>
             <div class="section-label">${this._t('map_height_lbl')}</div>
@@ -1354,6 +1355,11 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         const v = parseInt(e.target.value, 10);
         if (!isNaN(v) && v >= 200) this._set('map_height', v);
       });
+
+    // Remember the Advanced section's open state so editing a field (which
+    // re-renders the editor) doesn't collapse it.
+    this.shadowRoot.getElementById('advanced')
+      .addEventListener('toggle', e => { this._advancedOpen = e.target.open; });
   }
 
   _buildEntityPickers(entities) {
