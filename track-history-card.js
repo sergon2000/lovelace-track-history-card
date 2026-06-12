@@ -1042,6 +1042,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
           iconAnchor: [11, 11],
         }),
         interactive: false,
+        // Keep arrows below stop/start/end markers (Leaflet otherwise stacks
+        // markers by latitude, so an arrow could cover a cluster marker).
+        zIndexOffset: -1000,
       }).addTo(this._map);
     }
   }
