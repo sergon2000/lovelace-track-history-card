@@ -282,6 +282,16 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return TRANSLATIONS[getLang(this._hass)][key];
   }
 
+  // Format a time honouring the user's HA profile settings (12/24h + language).
+  _fmtTime(t) {
+    const locale = this._hass?.locale;
+    const opts = { hour: '2-digit', minute: '2-digit' };
+    if (locale?.time_format === '24') opts.hour12 = false;
+    else if (locale?.time_format === '12') opts.hour12 = true;
+    // 'language' / 'system' (or unset) → let Intl decide from the locale.
+    return t.toLocaleTimeString(locale?.language || [], opts);
+  }
+
   disconnectedCallback() {
     this._destroyMap();
   }
@@ -716,7 +726,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   _startEndMarker(L, startP, endP) {
-    const fmt = t => t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const fmt = t => this._fmtTime(t);
     const icon = L.divIcon({
       html: `<div style="
         width:26px;height:26px;border-radius:50%;
@@ -740,7 +750,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   _popupHtml(point, label = '', role = '') {
-    const fmt = t => t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const fmt = t => this._fmtTime(t);
     // Start stop → departure time (last point); end stop → arrival time
     // (first point); other stops → the full arrival–departure range.
     const timeHtml = role === 'start'
@@ -871,8 +881,8 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const el = this.shadowRoot.getElementById('summary');
     if (!points) { el.className = 'summary hidden'; return; }
 
-    const first = points[0].time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    const last  = points[points.length - 1].time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const first = this._fmtTime(points[0].time);
+    const last  = this._fmtTime(points[points.length - 1].time);
     const km    = this._totalKm(points);
 
     el.innerHTML = `
@@ -891,7 +901,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const items = this._buildTimeline(displayed);
     if (items.length === 0) { el.className = 'timeline hidden'; return; }
 
-    const fmt = t => t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const fmt = t => this._fmtTime(t);
     const rows = items.map(it => {
       if (it.type === 'stop') {
         const title = it.role === 'start' ? this._t('start')
