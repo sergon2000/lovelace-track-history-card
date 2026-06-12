@@ -663,11 +663,13 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
     // Main track polyline — smoothed per segment between anchors so the line
     // curves gently yet still passes exactly through every stop, start and end.
-    L.polyline(this._smoothPath(latlngs, anchors), {
+    const smoothed = this._smoothPath(latlngs, anchors);
+    L.polyline(smoothed, {
       color: '#1565C0', weight: 5, opacity: 0.85,
       lineJoin: 'round', lineCap: 'round',
     }).addTo(this._map);
-    this._addArrows(L, latlngs);
+    // Arrows follow the same smoothed geometry so they sit on the drawn line.
+    this._addArrows(L, smoothed);
 
     // Intermediate stop markers, numbered. The first/last stops get the
     // green/end pins below; in-transit points are represented by the line only.
