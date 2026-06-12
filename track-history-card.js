@@ -810,6 +810,14 @@ class LovelaceTrackHistoryCard extends HTMLElement {
           lat: group.reduce((s, p) => s + p.lat, 0) / group.length,
           lng: group.reduce((s, p) => s + p.lng, 0) / group.length,
         };
+      } else if (
+        i + 1 < points.length &&
+        this._haversine(centroid, points[i + 1]) * 1000 <= radiusMeters
+      ) {
+        // Single stray point that leaves the radius and immediately returns —
+        // ignore it so the line doesn't spike out and back, which also keeps
+        // the surrounding points as one cluster instead of splitting them.
+        continue;
       } else {
         groups.push(group);
         group    = [points[i]];
