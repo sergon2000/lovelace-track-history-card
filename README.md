@@ -98,6 +98,8 @@ min_points: 3
 | `cluster_radius` | `number` | `100` | Radius in meters for grouping nearby points into stop clusters. Points outside any cluster are treated as in-transit and are not marked individually. |
 | `min_points` | `number` | `3` | Minimum number of consecutive points within the radius required to form a cluster. Runs shorter than this are treated as in-transit. |
 
+> See [CLUSTERING.md](CLUSTERING.md) for a detailed explanation of how points are grouped into stops, how the line is smoothed, and how stray points are handled.
+
 ---
 
 ## Usage
