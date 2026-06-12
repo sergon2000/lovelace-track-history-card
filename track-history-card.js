@@ -686,9 +686,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     if (sameZone) {
       this._startEndMarker(L, startP, endP).addTo(this._map);
     } else {
-      this._pinMarker(L, startP, '#2E7D32', '', this._t('start'), 'start').addTo(this._map);
+      this._pinMarker(L, startP, '#2E7D32', this._t('start'), 'start').addTo(this._map);
       if (displayed.length > 1) {
-        this._pinMarker(L, endP, '#C62828', '', this._t('end'), 'end').addTo(this._map);
+        this._pinMarker(L, endP, '#C62828', this._t('end'), 'end').addTo(this._map);
       }
     }
 
@@ -696,22 +696,18 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return displayed;
   }
 
-  _pinMarker(L, point, color, letter, label, role = '') {
+  _pinMarker(L, point, color, label, role = '') {
     const icon = L.divIcon({
-      html: `
-        <div style="
-          background:${color};color:#fff;
-          width:26px;height:26px;border-radius:50% 50% 50% 0;
-          transform:rotate(-45deg);
-          display:flex;align-items:center;justify-content:center;
-          font-size:11px;font-weight:700;
-          border:2px solid rgba(255,255,255,.9);
-          box-shadow:0 2px 6px rgba(0,0,0,.35);
-        "><span style="transform:rotate(45deg)">${letter}</span></div>`,
+      html: `<div style="
+        width:26px;height:26px;border-radius:50%;
+        background:${color};
+        border:2px solid rgba(255,255,255,.9);
+        box-shadow:0 2px 6px rgba(0,0,0,.35);
+      "></div>`,
       className: '',
       iconSize: [26, 26],
-      iconAnchor: [13, 26],
-      popupAnchor: [0, -28],
+      iconAnchor: [13, 13],
+      popupAnchor: [0, -16],
     });
     return L.marker([point.lat, point.lng], { icon })
       .bindPopup(this._popupHtml(point, label, role));
