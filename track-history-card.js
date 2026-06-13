@@ -933,8 +933,11 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       iconAnchor: [13, 13],
       popupAnchor: [0, -16],
     });
+    // Start and end coincide here, so they share a zone — show it once, first.
+    const zone = this._zoneName(startP);
     const popup = `
       <div style="min-width:120px">
+        ${zone ? `<strong>(${zone})</strong><br>` : ''}
         <strong>${this._t('start')}</strong> 🕐 ${fmt(startP.timeTo ?? startP.time)}<br>
         <strong>${this._t('end')}</strong> 🕐 ${fmt(endP.time)}
       </div>`;
@@ -945,6 +948,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
   _popupHtml(point, label = '', role = '') {
     const fmt = t => this._fmtTime(t);
+    // Zone (if any) is appended in parentheses right after the label.
+    const zone = this._zoneName(point);
+    const labelText = label && zone ? `${label} (${zone})` : label;
     // Start stop → departure time (last point); end stop → arrival time
     // (first point); other stops → the full arrival–departure range.
     const timeHtml = role === 'start'
@@ -956,7 +962,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       : `🕐 ${fmt(point.time)}`;
     return `
       <div style="min-width:120px">
-        ${label ? `<strong>${label}</strong><br>` : ''}
+        ${labelText ? `<strong>${labelText}</strong><br>` : ''}
         ${timeHtml}
       </div>`;
   }
