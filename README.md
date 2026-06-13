@@ -62,6 +62,7 @@ The card supports a **visual editor** — click the pencil icon after adding the
 - **Title** — card header text
 - **Tracked devices** — add / remove `device_tracker` entities with an autocomplete picker
 - **Default device** — entity pre-selected on load (dropdown populated from the list above)
+- **Direction arrows** — show / hide the arrows along the path, and set how many are drawn
 - **Theme** — map theme: System (follows Home Assistant), Light, or Dark
 - **Timeline** — show a panel below the map listing stops and movements
 - **Map height** — map height in pixels
@@ -80,6 +81,8 @@ entities:
 default_entity: device_tracker.jane_iphone
 theme: system
 show_timeline: true
+show_arrows: true
+arrow_count: 30
 map_height: 450
 cluster_radius: 100
 min_points: 3
@@ -94,6 +97,8 @@ min_points: 3
 | `default_entity` | `string` | first entity | Entity pre-selected in the dropdown on load. Must be present in `entities`. If omitted or not found, the first entity is used. |
 | `theme` | `string` | `system` | Map theme: `system` (follows the Home Assistant light/dark mode), `light`, or `dark`. |
 | `show_timeline` | `boolean` | `false` | Show a timeline panel below the map listing each stop with its time range and the distance travelled between stops. |
+| `show_arrows` | `boolean` | `true` | Draw direction arrows along the path. Set to `false` to hide them. |
+| `arrow_count` | `number` | `30` | Number of direction arrows, spread evenly by distance along the path. Ignored when `show_arrows` is `false`. |
 | `map_height` | `number` | `400` | Map height in pixels |
 | `cluster_radius` | `number` | `100` | Radius in meters for grouping nearby points into stop clusters. Points outside any cluster are treated as in-transit and are not marked individually. |
 | `min_points` | `number` | `3` | Minimum number of consecutive points within the radius required to form a cluster. Runs shorter than this are treated as in-transit. |

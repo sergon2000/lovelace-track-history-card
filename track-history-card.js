@@ -11,6 +11,8 @@
  *     - device_tracker.jane_iphone
  *   default_entity: device_tracker.john_phone
  *   map_height: 450
+ *   show_arrows: true    # direction arrows on the path (default true)
+ *   arrow_count: 30      # number of arrows when enabled (default 30)
  */
 
 const LEAFLET_VERSION = '1.9.4';
@@ -46,6 +48,8 @@ const TRANSLATIONS = {
     theme_dark:        'Dark',
     advanced_lbl:      'Advanced',
     timeline_lbl:      'Timeline',
+    arrows_lbl:        'Direction arrows',
+    arrow_count_lbl:   'Number of arrows',
     stop_n:            'Stop',
     moving:            'Moving',
     recenter:          'Recenter',
@@ -77,6 +81,8 @@ const TRANSLATIONS = {
     theme_dark:        'Oscuro',
     advanced_lbl:      'Avanzado',
     timeline_lbl:      'Cronología',
+    arrows_lbl:        'Flechas de dirección',
+    arrow_count_lbl:   'Número de flechas',
     stop_n:            'Parada',
     moving:            'En movimiento',
     recenter:          'Recentrar',
@@ -108,6 +114,8 @@ const TRANSLATIONS = {
     theme_dark:        'Sombre',
     advanced_lbl:      'Avancé',
     timeline_lbl:      'Chronologie',
+    arrows_lbl:        'Flèches de direction',
+    arrow_count_lbl:   'Nombre de flèches',
     stop_n:            'Arrêt',
     moving:            'En mouvement',
     recenter:          'Recentrer',
@@ -139,6 +147,8 @@ const TRANSLATIONS = {
     theme_dark:        'Dunkel',
     advanced_lbl:      'Erweitert',
     timeline_lbl:      'Zeitleiste',
+    arrows_lbl:        'Richtungspfeile',
+    arrow_count_lbl:   'Anzahl der Pfeile',
     stop_n:            'Halt',
     moving:            'In Bewegung',
     recenter:          'Neu zentrieren',
@@ -170,6 +180,8 @@ const TRANSLATIONS = {
     theme_dark:        'Scuro',
     advanced_lbl:      'Avanzate',
     timeline_lbl:      'Cronologia',
+    arrows_lbl:        'Frecce di direzione',
+    arrow_count_lbl:   'Numero di frecce',
     stop_n:            'Sosta',
     moving:            'In movimento',
     recenter:          'Ricentra',
@@ -201,6 +213,8 @@ const TRANSLATIONS = {
     theme_dark:        'Escuro',
     advanced_lbl:      'Avançado',
     timeline_lbl:      'Cronologia',
+    arrows_lbl:        'Setas de direção',
+    arrow_count_lbl:   'Número de setas',
     stop_n:            'Paragem',
     moving:            'Em movimento',
     recenter:          'Recentrar',
@@ -773,7 +787,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       lineJoin: 'round', lineCap: 'round',
     }).addTo(this._map);
     // Arrows follow the same smoothed geometry so they sit on the drawn line.
-    this._addArrows(L, smoothed);
+    if (this._config.show_arrows !== false) this._addArrows(L, smoothed);
 
     // Intermediate stop markers, numbered. The first/last stops get the
     // green/end pins below; in-transit points are represented by the line only.
@@ -1199,8 +1213,10 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     }
     if (total === 0) return;
 
-    // Aim for ~30 arrows total so long trips don't render hundreds of markers.
-    const stepDist = total / 30;
+    // Spread the configured number of arrows evenly by distance (default 30),
+    // so long trips don't render hundreds of markers.
+    const count    = Math.max(1, this._config.arrow_count ?? 30);
+    const stepDist = total / count;
     let nextAt = stepDist;  // distance from the start at which to drop the next arrow
     let acc    = 0;         // cumulative distance up to the start of the current segment
 
@@ -1295,6 +1311,8 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     const minPoints     = this._config.min_points ?? 3;
     const themeValue    = this._config.theme || 'system';
     const showTimeline  = !!this._config.show_timeline;
+    const showArrows    = this._config.show_arrows !== false;
+    const arrowCount    = this._config.arrow_count ?? 30;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -1447,6 +1465,18 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
 
         <div>
           <label class="check-label">
+            <input type="checkbox" id="arrows-check" ${showArrows ? 'checked' : ''}>
+            <span>${this._t('arrows_lbl')}</span>
+          </label>
+          <div id="arrow-count-wrap" style="display:${showArrows ? 'block' : 'none'}; margin-top:8px;">
+            <div class="section-label">${this._t('arrow_count_lbl')}</div>
+            <input type="number" id="f-arrow-count" class="text-input" style="margin-top:0"
+              value="${arrowCount}" min="1" max="200">
+          </div>
+        </div>
+
+        <div>
+          <label class="check-label">
             <input type="checkbox" id="timeline-check" ${showTimeline ? 'checked' : ''}>
             <span>${this._t('timeline_lbl')}</span>
           </label>
@@ -1524,6 +1554,21 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
 
     this.shadowRoot.getElementById('timeline-check')
       .addEventListener('change', e => this._set('show_timeline', e.target.checked ? true : null));
+
+    this.shadowRoot.getElementById('arrows-check')
+      .addEventListener('change', e => {
+        // Arrows on is the default, so store only the "off" state.
+        const wrap = this.shadowRoot.getElementById('arrow-count-wrap');
+        if (wrap) wrap.style.display = e.target.checked ? 'block' : 'none';
+        this._set('show_arrows', e.target.checked ? null : false);
+      });
+
+    this.shadowRoot.getElementById('f-arrow-count')
+      .addEventListener('change', e => {
+        const v = parseInt(e.target.value, 10);
+        // 30 is the default, so drop the key when it matches to keep config clean.
+        this._set('arrow_count', (!isNaN(v) && v >= 1 && v !== 30) ? v : null);
+      });
 
     this.shadowRoot.getElementById('f-cluster-radius')
       .addEventListener('change', e => {
