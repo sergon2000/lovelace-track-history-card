@@ -54,8 +54,9 @@ shadowRoot (`_injectLeafletCss`).
 | `default_entity` | first       | Pre-selected device.                              |
 | `theme`          | `system`    | `system` / `light` / `dark` (map tiles).          |
 | `show_timeline`  | `false`     | Timeline panel below the map.                     |
-| `map_height`     | `400`       | Pixels.                                           |
-| `cluster_radius` | `100`       | Meters. See CLUSTERING.md.                        |
+| `map_height`     | `450`       | Pixels.                                           |
+| `units`          | `metric`    | `metric` (m/km) or `imperial` (ft/mi). Sets `cluster_radius` unit too. |
+| `cluster_radius` | `100`       | In `units` (m / ft). Always converted to metres internally. See CLUSTERING.md. |
 | `min_points`     | `3`         | Min consecutive points for a stop. See CLUSTERING.md. |
 
 ## Gotchas & decisions (read before changing related code)
@@ -122,7 +123,8 @@ shadowRoot (`_injectLeafletCss`).
   check (Python one-liner), since there's no linter/build.
 - **Releases**: `gh release create vX.Y.Z track-history-card.js --title "vX.Y.Z"
   --notes "..."`. HACS then shows the update. The user decides the version bump
-  (features → minor, fixes → patch). Latest released: **v1.3.0**.
+  (features → minor, fixes → patch). Check the latest published version with
+  `gh release list -L 1`.
 
 ## Testing tips
 

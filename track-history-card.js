@@ -11,6 +11,7 @@
  *     - device_tracker.jane_iphone
  *   default_entity: device_tracker.john_phone
  *   map_height: 450
+ *   units: metric        # metric (default) or imperial
  */
 
 const LEAFLET_VERSION = '1.9.4';
@@ -38,8 +39,11 @@ const TRANSLATIONS = {
     first_in_list:  '— first in list —',
     map_height_lbl:    'Map height (px)',
     remove:            'Remove',
-    cluster_radius_lbl:'Cluster radius (m)',
+    cluster_radius_lbl:'Cluster radius',
     min_points_lbl:    'Minimum points per cluster',
+    units_lbl:         'Units',
+    units_metric:      'Metric',
+    units_imperial:    'Imperial',
     theme_lbl:         'Theme',
     theme_system:      'System',
     theme_light:       'Light',
@@ -69,8 +73,11 @@ const TRANSLATIONS = {
     first_in_list:  '— primero de la lista —',
     map_height_lbl:    'Altura del mapa (px)',
     remove:            'Eliminar',
-    cluster_radius_lbl:'Radio de agrupación (m)',
+    cluster_radius_lbl:'Radio de agrupación',
     min_points_lbl:    'Puntos mínimos por agrupación',
+    units_lbl:         'Sistema de medida',
+    units_metric:      'Métrico',
+    units_imperial:    'Imperial',
     theme_lbl:         'Tema',
     theme_system:      'Sistema',
     theme_light:       'Claro',
@@ -100,8 +107,11 @@ const TRANSLATIONS = {
     first_in_list:  '— premier de la liste —',
     map_height_lbl:    'Hauteur de la carte (px)',
     remove:            'Supprimer',
-    cluster_radius_lbl:'Rayon de regroupement (m)',
+    cluster_radius_lbl:'Rayon de regroupement',
     min_points_lbl:    'Points minimum par regroupement',
+    units_lbl:         'Unités',
+    units_metric:      'Métrique',
+    units_imperial:    'Impérial',
     theme_lbl:         'Thème',
     theme_system:      'Système',
     theme_light:       'Clair',
@@ -131,8 +141,11 @@ const TRANSLATIONS = {
     first_in_list:  '— erstes in der Liste —',
     map_height_lbl:    'Kartenhöhe (px)',
     remove:            'Entfernen',
-    cluster_radius_lbl:'Gruppierungsradius (m)',
+    cluster_radius_lbl:'Gruppierungsradius',
     min_points_lbl:    'Mindestpunkte pro Gruppierung',
+    units_lbl:         'Einheiten',
+    units_metric:      'Metrisch',
+    units_imperial:    'Imperial',
     theme_lbl:         'Design',
     theme_system:      'System',
     theme_light:       'Hell',
@@ -162,8 +175,11 @@ const TRANSLATIONS = {
     first_in_list:  '— primo della lista —',
     map_height_lbl:    'Altezza mappa (px)',
     remove:            'Rimuovi',
-    cluster_radius_lbl:'Raggio di raggruppamento (m)',
+    cluster_radius_lbl:'Raggio di raggruppamento',
     min_points_lbl:    'Punti minimi per raggruppamento',
+    units_lbl:         'Unità di misura',
+    units_metric:      'Metrico',
+    units_imperial:    'Imperiale',
     theme_lbl:         'Tema',
     theme_system:      'Sistema',
     theme_light:       'Chiaro',
@@ -193,8 +209,11 @@ const TRANSLATIONS = {
     first_in_list:  '— primeiro da lista —',
     map_height_lbl:    'Altura do mapa (px)',
     remove:            'Remover',
-    cluster_radius_lbl:'Raio de agrupamento (m)',
+    cluster_radius_lbl:'Raio de agrupamento',
     min_points_lbl:    'Pontos mínimos por agrupamento',
+    units_lbl:         'Unidades',
+    units_metric:      'Métrico',
+    units_imperial:    'Imperial',
     theme_lbl:         'Tema',
     theme_system:      'Sistema',
     theme_light:       'Claro',
@@ -250,7 +269,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { entities: [], map_height: 400, cluster_radius: 100, min_points: 3, theme: 'system' };
+    return { entities: [], map_height: 450, cluster_radius: 100, min_points: 3, theme: 'system' };
   }
 
   setConfig(config) {
@@ -258,7 +277,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       throw new Error('[lovelace-track-history-card] "entities" must be a non-empty list of device_tracker entity IDs.');
     }
     this._config = {
-      map_height: 400,
+      map_height: 450,
       default_entity: null,
       cluster_radius: 100,
       min_points: 3,
@@ -758,7 +777,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       }).addTo(this._map);
     }
 
-    const displayed = this._clusterPoints(points, this._config.cluster_radius, this._config.min_points);
+    const displayed = this._clusterPoints(points, this._radiusMeters(), this._config.min_points);
     this._numberStops(displayed);
     const latlngs   = displayed.map(p => [p.lat, p.lng]);
     // Stops (clusters) are anchors the smoothed line must pass through, so it
@@ -787,7 +806,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const startP = displayed[0];
     const endP   = displayed[displayed.length - 1];
     const sameZone = displayed.length > 1
-      && this._haversine(startP, endP) * 1000 <= (this._config.cluster_radius || 100);
+      && this._haversine(startP, endP) * 1000 <= this._radiusMeters();
 
     if (sameZone) {
       this._startEndMarker(L, startP, endP).addTo(this._map);
@@ -1002,12 +1021,12 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
     const first = this._fmtTime(points[0].time);
     const last  = this._fmtTime(points[points.length - 1].time);
-    const km    = this._totalKm(points);
+    const dist  = this._fmtDist(this._totalKm(points));
 
     el.innerHTML = `
       <span class="summary-item">📍 ${points.length} ${this._t('points')}</span>
       <span class="summary-item">🕐 ${first} – ${last}</span>
-      <span class="summary-item">📏 ~${km} km</span>
+      <span class="summary-item">📏 ~${dist}</span>
     `;
     el.className = 'summary';
   }
@@ -1097,7 +1116,19 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   _fmtDist(km) {
+    if (this._config.units === 'imperial') {
+      const miles = km / 1.609344;
+      // Below ~0.1 mi (≈528 ft) show feet, otherwise miles — mirrors the m/km split.
+      return miles < 0.1 ? `${Math.round(km * 3280.84)} ft` : `${miles.toFixed(1)} mi`;
+    }
     return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+  }
+
+  // The cluster radius is entered in the configured units (m or ft) but the
+  // clustering math works in metres, so convert feet → metres when imperial.
+  _radiusMeters() {
+    const r = this._config.cluster_radius ?? 100;
+    return this._config.units === 'imperial' ? r * 0.3048 : r;
   }
 
   // Dwell time for a stop, given a span in milliseconds (Date subtraction)
@@ -1129,7 +1160,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   _totalKm(points) {
     let d = 0;
     for (let i = 1; i < points.length; i++) d += this._haversine(points[i - 1], points[i]);
-    return d.toFixed(1);
+    return d; // km
   }
 
   _smoothPath(latlngs, anchors = [], iterations = 3) {
@@ -1258,7 +1289,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
   }
 
   _render() {
-    const { entities = [], default_entity = '', map_height = 400 } = this._config;
+    const { entities = [], default_entity = '', map_height = 450 } = this._config;
     const hasTitle      = this._showTitle;
     const titleValue    = this._config.title || '';
     const hasDefault    = !!this._config.default_entity;
@@ -1267,6 +1298,8 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     const minPoints     = this._config.min_points ?? 3;
     const themeValue    = this._config.theme || 'system';
     const showTimeline  = !!this._config.show_timeline;
+    const unitsValue    = this._config.units || 'metric';
+    const unitSuffix    = unitsValue === 'imperial' ? 'ft' : 'm';
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -1444,7 +1477,18 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           </div>
 
           <div>
-            <div class="section-label">${this._t('cluster_radius_lbl')}</div>
+            <div class="section-label">${this._t('units_lbl')}</div>
+            <div class="radio-group">
+              ${['metric', 'imperial'].map(v => `
+                <label class="radio-label">
+                  <input type="radio" name="units-radio" value="${v}" ${unitsValue === v ? 'checked' : ''}>
+                  <span>${this._t('units_' + v)}</span>
+                </label>`).join('')}
+            </div>
+          </div>
+
+          <div>
+            <div class="section-label">${this._t('cluster_radius_lbl')} (${unitSuffix})</div>
             <input type="number" id="f-cluster-radius" class="text-input" style="margin-top:0"
               value="${clusterRadius}" min="1" max="10000">
           </div>
@@ -1492,6 +1536,11 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     this.shadowRoot.querySelectorAll('input[name="theme-radio"]')
       .forEach(r => r.addEventListener('change', e => {
         if (e.target.checked) this._set('theme', e.target.value);
+      }));
+
+    this.shadowRoot.querySelectorAll('input[name="units-radio"]')
+      .forEach(r => r.addEventListener('change', e => {
+        if (e.target.checked) this._set('units', e.target.value === 'imperial' ? 'imperial' : null);
       }));
 
     this.shadowRoot.getElementById('timeline-check')
