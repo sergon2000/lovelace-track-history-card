@@ -22,6 +22,7 @@ const LEAFLET_CSS_URL = `https://unpkg.com/leaflet@${LEAFLET_VERSION}/dist/leafl
 const TRANSLATIONS = {
   en: {
     device:         'Device',
+    track_of:       'Track of',
     date:           'Date',
     load:           'Load',
     loading:        'Loading…',
@@ -53,6 +54,7 @@ const TRANSLATIONS = {
   },
   es: {
     device:         'Dispositivo',
+    track_of:       'Trayecto de',
     date:           'Fecha',
     load:           'Cargar',
     loading:        'Cargando…',
@@ -84,6 +86,7 @@ const TRANSLATIONS = {
   },
   fr: {
     device:         'Appareil',
+    track_of:       'Trajet de',
     date:           'Date',
     load:           'Charger',
     loading:        'Chargement…',
@@ -115,6 +118,7 @@ const TRANSLATIONS = {
   },
   de: {
     device:         'Gerät',
+    track_of:       'Verlauf von',
     date:           'Datum',
     load:           'Laden',
     loading:        'Lädt…',
@@ -146,6 +150,7 @@ const TRANSLATIONS = {
   },
   it: {
     device:         'Dispositivo',
+    track_of:       'Percorso di',
     date:           'Data',
     load:           'Carica',
     loading:        'Caricamento…',
@@ -177,6 +182,7 @@ const TRANSLATIONS = {
   },
   pt: {
     device:         'Dispositivo',
+    track_of:       'Trajeto de',
     date:           'Data',
     load:           'Carregar',
     loading:        'A carregar…',
@@ -354,7 +360,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
           <div class="controls">
             ${this._config.entities.length > 1 ? `
             <div class="ctrl-group">
-              <label>${this._t('device')}</label>
+              <label>${this._t('track_of')}</label>
               <select id="entity-select">
                 ${this._config.entities.map(e => {
                   const label = this._deviceLabel(e);
