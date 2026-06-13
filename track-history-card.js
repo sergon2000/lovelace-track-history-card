@@ -938,7 +938,14 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         const title = it.role === 'start' ? this._t('start')
           : it.role === 'end' ? this._t('end')
           : `${this._t('stop_n')} ${it.n}`;
-        const icon = it.role === 'start' ? '🟢' : it.role === 'end' ? '🔴' : '📍';
+        const icon = it.role === 'start' ? '🟢'
+          : it.role === 'end' ? '🔴'
+          : `<span style="
+              display:inline-flex;align-items:center;justify-content:center;
+              width:18px;height:18px;border-radius:50%;
+              background:#F57C00;color:#fff;
+              font-size:10px;font-weight:700;
+            ">${it.n}</span>`;
         // Start → departure (last point); end → arrival (first point);
         // other stops → the full arrival–departure range.
         const timeStr = it.role === 'start' ? `🕐 ${fmt(it.timeTo)}`
