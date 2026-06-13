@@ -123,7 +123,8 @@ shadowRoot (`_injectLeafletCss`).
   check (Python one-liner), since there's no linter/build.
 - **Releases**: `gh release create vX.Y.Z track-history-card.js --title "vX.Y.Z"
   --notes "..."`. HACS then shows the update. The user decides the version bump
-  (features → minor, fixes → patch). Latest released: **v1.3.0**.
+  (features → minor, fixes → patch). Check the latest published version with
+  `gh release list -L 1`.
 
 ## Testing tips
 
