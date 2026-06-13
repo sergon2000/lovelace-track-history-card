@@ -1497,7 +1497,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         <div class="check-row">
           <label class="check-label">
             <input type="checkbox" id="arrows-check" ${showArrows ? 'checked' : ''}>
-            <span>${this._t('arrows_lbl')}</span>
+            <span>${this._t('arrows_lbl')} ${range('arrow_count')}</span>
           </label>
           <input type="number" id="f-arrow-count" class="text-input"
             value="${arrowCount}" min="${LIMITS.arrow_count.min}" max="${LIMITS.arrow_count.max}"
