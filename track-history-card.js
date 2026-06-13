@@ -279,10 +279,26 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       theme: 'system',
       ...config,
     };
+    // Enforce the same ranges as the editor here too, so a hand-edited YAML
+    // can't bypass them. Out-of-range / non-numeric values are clamped (or
+    // fall back to the default), matching what the visual editor would store.
+    this._config.map_height     = this._clampNum(this._config.map_height,     200, 1000, 400);
+    this._config.cluster_radius = this._clampNum(this._config.cluster_radius,  100,  500, 100);
+    this._config.min_points     = this._clampNum(this._config.min_points,        2,    5,   3);
+    if (this._config.arrow_count != null) {
+      this._config.arrow_count  = this._clampNum(this._config.arrow_count,      10,   30,  30);
+    }
     this._build();
     // Redraw the map on config changes (e.g. from the visual editor) once
     // hass is available and the first load has already happened.
     if (this._hass && this._autoLoaded) this._onLoad();
+  }
+
+  // Clamp a config value to [min, max], rounding to an integer and falling
+  // back to `def` when it's missing or not a number.
+  _clampNum(v, min, max, def) {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : def;
   }
 
   set hass(hass) {
