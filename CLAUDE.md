@@ -54,10 +54,12 @@ shadowRoot (`_injectLeafletCss`).
 | `default_entity` | first       | Pre-selected device.                              |
 | `theme`          | `system`    | `system` / `light` / `dark` (map tiles).          |
 | `show_timeline`  | `false`     | Timeline panel below the map.                     |
-| `map_height`     | `450`       | Pixels.                                           |
+| `show_arrows`    | `true`      | Direction arrows along the path.                  |
+| `arrow_count`    | `30`        | Number of arrows (spread by distance, range 10–30). See `_addArrows`. |
+| `map_height`     | `450`       | Pixels (range 200–1000).                          |
 | `units`          | `metric`    | `metric` (m/km) or `imperial` (ft/mi). Sets `cluster_radius` unit too. |
-| `cluster_radius` | `100`       | In `units` (m / ft). Always converted to metres internally. See CLUSTERING.md. |
-| `min_points`     | `3`         | Min consecutive points for a stop. See CLUSTERING.md. |
+| `cluster_radius` | `200`       | In `units` (m / ft), range 50–500. Converted to metres internally. See CLUSTERING.md. |
+| `min_points`     | `3`         | Min consecutive points for a stop (range 2–5). See CLUSTERING.md. |
 
 ## Gotchas & decisions (read before changing related code)
 

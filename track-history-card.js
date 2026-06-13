@@ -12,11 +12,23 @@
  *   default_entity: device_tracker.john_phone
  *   map_height: 450
  *   units: metric        # metric (default) or imperial
+ *   show_arrows: true    # direction arrows on the path (default true)
+ *   arrow_count: 30      # number of arrows when enabled (default 30)
  */
 
 const LEAFLET_VERSION = '1.9.4';
 const LEAFLET_JS_URL = `https://unpkg.com/leaflet@${LEAFLET_VERSION}/dist/leaflet.js`;
 const LEAFLET_CSS_URL = `https://unpkg.com/leaflet@${LEAFLET_VERSION}/dist/leaflet.css`;
+
+// Numeric config limits — the single source of truth for each field's default
+// and the range enforced in setConfig, the editor inputs and the editor labels.
+// Change a value here and it propagates everywhere.
+const LIMITS = {
+  map_height:     { min: 200, max: 1000, def: 450 },
+  cluster_radius: { min:  50, max:  500, def: 200 },
+  min_points:     { min:   2, max:    5, def:   3 },
+  arrow_count:    { min:  10, max:   30, def:  30 },
+};
 
 // ── Translations ──────────────────────────────────────────────────────────────
 
@@ -50,6 +62,8 @@ const TRANSLATIONS = {
     theme_dark:        'Dark',
     advanced_lbl:      'Advanced',
     timeline_lbl:      'Timeline',
+    arrows_lbl:        'Direction arrows',
+    arrow_count_lbl:   'Number of arrows',
     stop_n:            'Stop',
     moving:            'Moving',
     recenter:          'Recenter',
@@ -84,6 +98,8 @@ const TRANSLATIONS = {
     theme_dark:        'Oscuro',
     advanced_lbl:      'Avanzado',
     timeline_lbl:      'Cronología',
+    arrows_lbl:        'Flechas de dirección',
+    arrow_count_lbl:   'Número de flechas',
     stop_n:            'Parada',
     moving:            'En movimiento',
     recenter:          'Recentrar',
@@ -118,6 +134,8 @@ const TRANSLATIONS = {
     theme_dark:        'Sombre',
     advanced_lbl:      'Avancé',
     timeline_lbl:      'Chronologie',
+    arrows_lbl:        'Flèches de direction',
+    arrow_count_lbl:   'Nombre de flèches',
     stop_n:            'Arrêt',
     moving:            'En mouvement',
     recenter:          'Recentrer',
@@ -152,6 +170,8 @@ const TRANSLATIONS = {
     theme_dark:        'Dunkel',
     advanced_lbl:      'Erweitert',
     timeline_lbl:      'Zeitleiste',
+    arrows_lbl:        'Richtungspfeile',
+    arrow_count_lbl:   'Anzahl der Pfeile',
     stop_n:            'Halt',
     moving:            'In Bewegung',
     recenter:          'Neu zentrieren',
@@ -186,6 +206,8 @@ const TRANSLATIONS = {
     theme_dark:        'Scuro',
     advanced_lbl:      'Avanzate',
     timeline_lbl:      'Cronologia',
+    arrows_lbl:        'Frecce di direzione',
+    arrow_count_lbl:   'Numero di frecce',
     stop_n:            'Sosta',
     moving:            'In movimento',
     recenter:          'Ricentra',
@@ -220,6 +242,8 @@ const TRANSLATIONS = {
     theme_dark:        'Escuro',
     advanced_lbl:      'Avançado',
     timeline_lbl:      'Cronologia',
+    arrows_lbl:        'Setas de direção',
+    arrow_count_lbl:   'Número de setas',
     stop_n:            'Paragem',
     moving:            'Em movimento',
     recenter:          'Recentrar',
@@ -269,7 +293,13 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { entities: [], map_height: 450, cluster_radius: 100, min_points: 3, theme: 'system' };
+    return {
+      entities: [],
+      map_height: LIMITS.map_height.def,
+      cluster_radius: LIMITS.cluster_radius.def,
+      min_points: LIMITS.min_points.def,
+      theme: 'system',
+    };
   }
 
   setConfig(config) {
@@ -277,17 +307,30 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       throw new Error('[lovelace-track-history-card] "entities" must be a non-empty list of device_tracker entity IDs.');
     }
     this._config = {
-      map_height: 450,
       default_entity: null,
-      cluster_radius: 100,
-      min_points: 3,
       theme: 'system',
       ...config,
     };
+    // Enforce the same ranges as the editor here too, so a hand-edited YAML
+    // can't bypass them. Missing / out-of-range / non-numeric values are
+    // clamped or fall back to the default — matching what the editor stores.
+    this._config.map_height     = this._clampNum(this._config.map_height,     LIMITS.map_height);
+    this._config.cluster_radius = this._clampNum(this._config.cluster_radius,  LIMITS.cluster_radius);
+    this._config.min_points     = this._clampNum(this._config.min_points,      LIMITS.min_points);
+    if (this._config.arrow_count != null) {
+      this._config.arrow_count  = this._clampNum(this._config.arrow_count,     LIMITS.arrow_count);
+    }
     this._build();
     // Redraw the map on config changes (e.g. from the visual editor) once
     // hass is available and the first load has already happened.
     if (this._hass && this._autoLoaded) this._onLoad();
+  }
+
+  // Clamp a config value to a field's [min, max], rounding to an integer and
+  // falling back to its default when missing or not a number.
+  _clampNum(v, { min, max, def }) {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(max, Math.max(min, Math.round(n))) : def;
   }
 
   set hass(hass) {
@@ -792,7 +835,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       lineJoin: 'round', lineCap: 'round',
     }).addTo(this._map);
     // Arrows follow the same smoothed geometry so they sit on the drawn line.
-    this._addArrows(L, smoothed);
+    if (this._config.show_arrows !== false) this._addArrows(L, smoothed);
 
     // Intermediate stop markers, numbered. The first/last stops get the
     // green/end pins below; in-transit points are represented by the line only.
@@ -1127,7 +1170,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   // The cluster radius is entered in the configured units (m or ft) but the
   // clustering math works in metres, so convert feet → metres when imperial.
   _radiusMeters() {
-    const r = this._config.cluster_radius ?? 100;
+    const r = this._config.cluster_radius ?? LIMITS.cluster_radius.def;
     return this._config.units === 'imperial' ? r * 0.3048 : r;
   }
 
@@ -1214,25 +1257,55 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
   _addArrows(L, latlngs) {
     if (latlngs.length < 2) return;
-    const step = Math.max(1, Math.floor(latlngs.length / 30));
-    for (let i = step; i < latlngs.length; i += step) {
+
+    // Per-segment lengths (km) and total path length, so arrows can be spaced
+    // by real distance rather than by vertex index. Index spacing left long
+    // straight stretches (few vertices) sparse and wiggly ones dense; equal
+    // distance spacing keeps the arrow density uniform along the whole route.
+    const segLen = [];
+    let total = 0;
+    for (let i = 1; i < latlngs.length; i++) {
+      const d = this._haversine(
+        { lat: latlngs[i - 1][0], lng: latlngs[i - 1][1] },
+        { lat: latlngs[i][0],     lng: latlngs[i][1] });
+      segLen.push(d);
+      total += d;
+    }
+    if (total === 0) return;
+
+    // Spread the configured number of arrows evenly by distance (default 30),
+    // so long trips don't render hundreds of markers.
+    const count    = Math.max(1, this._config.arrow_count ?? LIMITS.arrow_count.def);
+    const stepDist = total / count;
+    let nextAt = stepDist;  // distance from the start at which to drop the next arrow
+    let acc    = 0;         // cumulative distance up to the start of the current segment
+
+    for (let i = 1; i < latlngs.length; i++) {
+      const segStart = acc;
+      acc += segLen[i - 1];
       const [lat1, lng1] = latlngs[i - 1];
       const [lat2, lng2] = latlngs[i];
       const angle = this._bearing(lat1, lng1, lat2, lng2);
-      const mid   = [(lat1 + lat2) / 2, (lng1 + lng2) / 2];
-      L.marker(mid, {
-        icon: L.divIcon({
-          html: `<div style="transform:rotate(${angle}deg);font-size:22px;line-height:1;
-                   color:#1565C0;text-shadow:0 0 4px #fff,0 0 4px #fff;">▲</div>`,
-          className: '',
-          iconSize: [22, 22],
-          iconAnchor: [11, 11],
-        }),
-        interactive: false,
-        // Keep arrows below stop/start/end markers (Leaflet otherwise stacks
-        // markers by latitude, so an arrow could cover a cluster marker).
-        zIndexOffset: -1000,
-      }).addTo(this._map);
+      // Drop every arrow whose target distance lands inside this segment,
+      // interpolating its exact position along the segment.
+      while (nextAt <= acc && nextAt < total) {
+        const t   = segLen[i - 1] > 0 ? (nextAt - segStart) / segLen[i - 1] : 0;
+        const pos = [lat1 + (lat2 - lat1) * t, lng1 + (lng2 - lng1) * t];
+        nextAt += stepDist;
+        L.marker(pos, {
+          icon: L.divIcon({
+            html: `<div style="transform:rotate(${angle}deg);font-size:22px;line-height:1;
+                     color:#1565C0;text-shadow:0 0 4px #fff,0 0 4px #fff;">▲</div>`,
+            className: '',
+            iconSize: [22, 22],
+            iconAnchor: [11, 11],
+          }),
+          interactive: false,
+          // Keep arrows below stop/start/end markers (Leaflet otherwise stacks
+          // markers by latitude, so an arrow could cover a cluster marker).
+          zIndexOffset: -1000,
+        }).addTo(this._map);
+      }
     }
   }
 
@@ -1289,17 +1362,21 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
   }
 
   _render() {
-    const { entities = [], default_entity = '', map_height = 450 } = this._config;
+    const { entities = [], default_entity = '', map_height = LIMITS.map_height.def } = this._config;
     const hasTitle      = this._showTitle;
     const titleValue    = this._config.title || '';
     const hasDefault    = !!this._config.default_entity;
     const defaultValue  = this._config.default_entity || '';
-    const clusterRadius = this._config.cluster_radius ?? 100;
-    const minPoints     = this._config.min_points ?? 3;
+    const clusterRadius = this._config.cluster_radius ?? LIMITS.cluster_radius.def;
+    const minPoints     = this._config.min_points ?? LIMITS.min_points.def;
     const themeValue    = this._config.theme || 'system';
     const showTimeline  = !!this._config.show_timeline;
+    const showArrows    = this._config.show_arrows !== false;
+    const arrowCount    = this._config.arrow_count ?? LIMITS.arrow_count.def;
     const unitsValue    = this._config.units || 'metric';
     const unitSuffix    = unitsValue === 'imperial' ? 'ft' : 'm';
+    // "(min–max)" suffix appended to each numeric field's label/placeholder.
+    const range = (k) => `(${LIMITS[k].min}–${LIMITS[k].max})`;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -1419,7 +1496,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
       </style>
       <div class="editor">
         <div>
-          <div class="section-label">${this._t('tracked_devs')}</div>
+          <div class="section-label" style="margin-bottom:12px">${this._t('tracked_devs')}</div>
           <div id="entities-list"></div>
           <button class="add-btn" id="add-entity">${this._t('add_device')}</button>
         </div>
@@ -1450,6 +1527,18 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
             style="display:${hasTitle ? 'block' : 'none'}">
         </div>
 
+        <div class="check-row">
+          <label class="check-label">
+            <input type="checkbox" id="arrows-check" ${showArrows ? 'checked' : ''}>
+            <span>${this._t('arrows_lbl')} ${range('arrow_count')}</span>
+          </label>
+          <input type="number" id="f-arrow-count" class="text-input"
+            value="${arrowCount}" min="${LIMITS.arrow_count.min}" max="${LIMITS.arrow_count.max}"
+            title="${this._t('arrow_count_lbl')} ${range('arrow_count')}"
+            placeholder="${this._t('arrow_count_lbl')} ${range('arrow_count')}"
+            style="display:${showArrows ? 'block' : 'none'}">
+        </div>
+
         <div>
           <label class="check-label">
             <input type="checkbox" id="timeline-check" ${showTimeline ? 'checked' : ''}>
@@ -1471,9 +1560,9 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         <details class="advanced" id="advanced" ${this._advancedOpen ? 'open' : ''}>
           <summary>${this._t('advanced_lbl')}</summary>
           <div>
-            <div class="section-label">${this._t('map_height_lbl')}</div>
+            <div class="section-label">${this._t('map_height_lbl')} ${range('map_height')}</div>
             <input type="number" id="f-height" class="text-input" style="margin-top:0"
-              value="${map_height}" min="200" max="1000">
+              value="${map_height}" min="${LIMITS.map_height.min}" max="${LIMITS.map_height.max}">
           </div>
 
           <div>
@@ -1488,15 +1577,15 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           </div>
 
           <div>
-            <div class="section-label">${this._t('cluster_radius_lbl')} (${unitSuffix})</div>
+            <div class="section-label">${this._t('cluster_radius_lbl')} (${unitSuffix}) ${range('cluster_radius')}</div>
             <input type="number" id="f-cluster-radius" class="text-input" style="margin-top:0"
-              value="${clusterRadius}" min="1" max="10000">
+              value="${clusterRadius}" min="${LIMITS.cluster_radius.min}" max="${LIMITS.cluster_radius.max}">
           </div>
 
           <div>
-            <div class="section-label">${this._t('min_points_lbl')}</div>
+            <div class="section-label">${this._t('min_points_lbl')} ${range('min_points')}</div>
             <input type="number" id="f-min-points" class="text-input" style="margin-top:0"
-              value="${minPoints}" min="2" max="100">
+              value="${minPoints}" min="${LIMITS.min_points.min}" max="${LIMITS.min_points.max}">
           </div>
         </details>
       </div>
@@ -1546,28 +1635,50 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     this.shadowRoot.getElementById('timeline-check')
       .addEventListener('change', e => this._set('show_timeline', e.target.checked ? true : null));
 
+    this.shadowRoot.getElementById('arrows-check')
+      .addEventListener('change', e => {
+        // Arrows on is the default, so store only the "off" state.
+        const count = this.shadowRoot.getElementById('f-arrow-count');
+        if (count) count.style.display = e.target.checked ? 'block' : 'none';
+        this._set('show_arrows', e.target.checked ? null : false);
+      });
+
+    this.shadowRoot.getElementById('f-arrow-count')
+      .addEventListener('change', e => {
+        const v = this._clampInt(e.target, LIMITS.arrow_count);
+        // The default is implied, so drop the key when it matches to keep config clean.
+        this._set('arrow_count', v !== LIMITS.arrow_count.def ? v : null);
+      });
+
     this.shadowRoot.getElementById('f-cluster-radius')
       .addEventListener('change', e => {
-        const v = parseInt(e.target.value, 10);
-        this._set('cluster_radius', (!isNaN(v) && v >= 1) ? v : 100);
+        this._set('cluster_radius', this._clampInt(e.target, LIMITS.cluster_radius));
       });
 
     this.shadowRoot.getElementById('f-min-points')
       .addEventListener('change', e => {
-        const v = parseInt(e.target.value, 10);
-        this._set('min_points', (!isNaN(v) && v >= 2) ? v : 3);
+        this._set('min_points', this._clampInt(e.target, LIMITS.min_points));
       });
 
     this.shadowRoot.getElementById('f-height')
       .addEventListener('change', e => {
-        const v = parseInt(e.target.value, 10);
-        if (!isNaN(v) && v >= 200) this._set('map_height', v);
+        this._set('map_height', this._clampInt(e.target, LIMITS.map_height));
       });
 
     // Remember the Advanced section's open state so editing a field (which
     // re-renders the editor) doesn't collapse it.
     this.shadowRoot.getElementById('advanced')
       .addEventListener('toggle', e => { this._advancedOpen = e.target.open; });
+  }
+
+  // Parse a number field, clamp it to a field's [min, max] (falling back to its
+  // default when empty or non-numeric), and reflect the corrected value back
+  // into the input so a hand-typed out-of-range value is visibly snapped in.
+  _clampInt(el, { min, max, def }) {
+    const v = parseInt(el.value, 10);
+    const clamped = isNaN(v) ? def : Math.min(max, Math.max(min, v));
+    el.value = clamped;
+    return clamped;
   }
 
   _buildEntityPickers(entities) {
