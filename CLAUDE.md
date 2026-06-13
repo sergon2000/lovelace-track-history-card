@@ -114,7 +114,8 @@ shadowRoot (`_injectLeafletCss`).
   push, open a PR. (`gh pr create` has occasionally returned HTTP 401 here; the
   reliable fallback is `gh api repos/<repo>/pulls -f title=... -f body=... -f
   head=<branch> -f base=main`.)
-- **Merging**: `gh pr merge <n> --merge --delete-branch`.
+- **Merging**: `gh pr merge <n> --merge`. The repo auto-deletes merged
+  branches, so do NOT pass `--delete-branch` (it 404s on the already-gone branch).
 - **Commit messages** end with a trailer:
   `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`.
 - **No Node here** — sanity-check JS before committing with a brace/paren balance
