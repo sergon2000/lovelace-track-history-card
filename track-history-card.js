@@ -288,22 +288,39 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return TRANSLATIONS[getLang(this._hass)][key];
   }
 
-  // Human-readable label for a device_tracker in the selector. If the tracker
-  // belongs to a `person` that is linked to a Home Assistant user, show that
-  // person's name; otherwise fall back to the tracker's friendly_name and
-  // finally a title-cased entity id.
-  _deviceLabel(entityId) {
+  // The `person` linked to a Home Assistant user that owns this tracker, or
+  // null. A tracker can belong to at most one such person.
+  _personForTracker(entityId) {
     const states = this._hass?.states || {};
     for (const id in states) {
       if (!id.startsWith('person.')) continue;
       const attrs = states[id].attributes || {};
       if (attrs.user_id && Array.isArray(attrs.device_trackers)
           && attrs.device_trackers.includes(entityId)) {
-        return attrs.friendly_name || id.replace('person.', '');
+        return { id, name: attrs.friendly_name || id.replace('person.', '') };
       }
     }
-    return states[entityId]?.attributes?.friendly_name
+    return null;
+  }
+
+  // The tracker's own name: friendly_name, else a title-cased entity id.
+  _trackerName(entityId) {
+    return this._hass?.states[entityId]?.attributes?.friendly_name
       || entityId.replace('device_tracker.', '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  // Label for a device_tracker in the selector. Shows the owning user's name
+  // when the tracker is assigned to one — unless two configured trackers share
+  // the same user, in which case the user name would be ambiguous, so we keep
+  // the tracker names. Unassigned trackers always show their tracker name.
+  _deviceLabel(entityId) {
+    const person = this._personForTracker(entityId);
+    if (person) {
+      const shared = (this._config?.entities || []).some(
+        e => e !== entityId && this._personForTracker(e)?.id === person.id);
+      if (!shared) return person.name;
+    }
+    return this._trackerName(entityId);
   }
 
   // Format a time honouring the user's HA profile settings (12/24h + language).
