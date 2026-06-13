@@ -178,9 +178,13 @@ its map popup. The label is resolved in two tiers:
   Nominatim's ~1 req/sec policy. Only stops are looked up, never in-transit
   points. Each load gets a generation token (`_loadGen`); answers from a previous
   day/device are discarded so a late response can't land on the new track.
+- Place names are localised to the Home Assistant UI language (sent as
+  `accept-language`), so they match the rest of the card rather than following
+  the browser or the place's local language.
 - Results are cached in `localStorage` for 90 days (`GEO_TTL_MS`), keyed by the
-  stop's coordinates rounded to ~11 m, so recurring places and revisited days
-  reuse the cached address instead of calling the service again.
+  stop's coordinates rounded to ~11 m **and the UI language**, so recurring
+  places and revisited days reuse the cached address instead of calling the
+  service again (switching HA's language fetches fresh, correctly-localised names).
 
 ### Detail level (`_composeAddress`)
 

@@ -1355,9 +1355,16 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
   }
 
+  // Cache key is scoped by the HA UI language, since the cached components are
+  // localised by the `accept-language` sent to the geocoder — entries for one
+  // language must not be reused when the user switches HA to another.
+  _geoCacheKey(key) {
+    return `${GEO_CACHE_PREFIX}${getLang(this._hass)}:${key}`;
+  }
+
   _geoCacheGet(key) {
     try {
-      const raw = localStorage.getItem(GEO_CACHE_PREFIX + key);
+      const raw = localStorage.getItem(this._geoCacheKey(key));
       if (!raw) return null;
       const o = JSON.parse(raw);
       if (!o || !o.addr || (Date.now() - o.ts) > GEO_TTL_MS) return null;
@@ -1367,7 +1374,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
   _geoCacheSet(key, addr) {
     try {
-      localStorage.setItem(GEO_CACHE_PREFIX + key, JSON.stringify({ addr, ts: Date.now() }));
+      localStorage.setItem(this._geoCacheKey(key), JSON.stringify({ addr, ts: Date.now() }));
     } catch (_) { /* storage disabled / full — degrade to no cache */ }
   }
 
@@ -1377,7 +1384,10 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   async _reverseGeocode(lat, lng) {
     const base = this._config.geocode_url || NOMINATIM_REVERSE_URL;
     const sep = base.includes('?') ? '&' : '?';
-    const url = `${base}${sep}format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
+    // Localise place names to the HA UI language (same source as _fmtTime/Date)
+    // rather than letting the geocoder fall back to the browser or local language.
+    const lang = getLang(this._hass);
+    const url = `${base}${sep}format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1&accept-language=${lang}`;
     const res = await fetch(url, { headers: { Accept: 'application/json' } });
     if (!res.ok) return null;
     const json = await res.json();

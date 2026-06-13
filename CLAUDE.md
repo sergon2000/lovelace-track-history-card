@@ -123,9 +123,13 @@ shadowRoot (`_injectLeafletCss`).
 - **Browser can't set `User-Agent`** (forbidden header) — Nominatim's policy
   wants an identifiable client; the HA page `Referer` is what it gets. Nominatim
   sends `Access-Control-Allow-Origin: *`, so browser `fetch` works (no CORS proxy).
-- **Cache**: `localStorage`, key `thc:geo:<lat4,lng4>` (~11 m), TTL 90 days
-  (`GEO_TTL_MS`). Stores raw address **components**, not the final string —
-  detail is context-dependent (see next point). Per browser/device.
+- **Language**: place names are localised to the HA UI language via the
+  `accept-language` param (same source as `_fmtTime`/`_fmtDate`, `getLang`), not
+  the browser/local fallback.
+- **Cache**: `localStorage`, key `thc:geo:<lang>:<lat4,lng4>` (~11 m), TTL 90
+  days (`GEO_TTL_MS`). Language-scoped so switching HA's language doesn't reuse
+  the previous language's labels. Stores raw address **components**, not the
+  final string — detail is context-dependent (see next point). Per browser/device.
 - **Context-dependent detail** (`_composeAddress`): a city with one stop →
   `City, Country`; a city with ≥2 stops → street level. So labels can *upgrade*
   live as more stops in the same city resolve.
