@@ -113,7 +113,9 @@ timeline, so the two always match. The start/end clusters are shown by colour
 - **Combined start/end** — if the first and last points fall within
   `cluster_radius` of each other (a day that starts and ends in the same place,
   e.g. home), a single marker split half-green / half-red is drawn instead of two
-  overlapping markers (`_startEndMarker`).
+  overlapping markers (`_startEndMarker`). It sits at the midpoint of the two
+  points, and both ends of the polyline are snapped to that midpoint so the line
+  meets the marker exactly (otherwise it stops short, visible when zoomed in).
 - **In-transit points** — not marked.
 
 ### Start/end times

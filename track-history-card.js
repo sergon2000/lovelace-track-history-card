@@ -906,9 +906,25 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     // never cuts the corner of an isolated stop and leaves its marker uncrossed.
     const anchors   = displayed.reduce((a, p, i) => (p.count > 1 && a.push(i), a), []);
 
+    // Start/end markers. If both fall within the cluster radius (e.g. a day
+    // that starts and ends at home) they'd overlap, so a single combined
+    // half-green/half-red marker is drawn at their midpoint instead.
+    const startP = displayed[0];
+    const endP   = displayed[displayed.length - 1];
+    const sameZone = displayed.length > 1
+      && this._haversine(startP, endP) * 1000 <= this._radiusMeters();
+
     // Main track polyline — smoothed per segment between anchors so the line
     // curves gently yet still passes exactly through every stop, start and end.
     const smoothed = this._smoothPath(latlngs, anchors);
+    // With the combined marker the start and end points differ but the marker
+    // sits at their midpoint, so snap both line ends to that midpoint too —
+    // otherwise the line stops short of the marker (noticeable when zoomed in).
+    if (sameZone) {
+      const mid = [(startP.lat + endP.lat) / 2, (startP.lng + endP.lng) / 2];
+      smoothed[0] = mid;
+      smoothed[smoothed.length - 1] = mid;
+    }
     L.polyline(smoothed, {
       color: '#1565C0', weight: 5, opacity: 0.85,
       lineJoin: 'round', lineCap: 'round',
@@ -921,14 +937,6 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     displayed.forEach(p => {
       if (p.stopRole === 'mid') this._clusterMarker(L, p).addTo(this._trackLayer);
     });
-
-    // Start/end markers. If both fall within the cluster radius (e.g. a day
-    // that starts and ends at home) they'd overlap, so draw a single combined
-    // half-green/half-red marker instead.
-    const startP = displayed[0];
-    const endP   = displayed[displayed.length - 1];
-    const sameZone = displayed.length > 1
-      && this._haversine(startP, endP) * 1000 <= this._radiusMeters();
 
     if (sameZone) {
       this._startEndMarker(L, startP, endP).addTo(this._trackLayer);
