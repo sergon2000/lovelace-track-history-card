@@ -510,26 +510,80 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       }
       .tl-item {
         display: flex;
-        align-items: flex-start;
         gap: 10px;
         font-size: 13px;
         color: var(--primary-text-color, #333);
+        padding: 6px 10px;
+        border-radius: 8px;
       }
-      .tl-icon {
+      /* Stops get a zebra background so the right-hand value reads as part of
+         the same row; movement segments stay transparent in between. */
+      .tl-item.tl-stop {
+        background: var(--secondary-background-color, rgba(0, 0, 0, 0.05));
+      }
+      .tl-rail {
+        position: relative;
         flex-shrink: 0;
         width: 22px;
-        text-align: center;
-        line-height: 1.5;
       }
-      .tl-body { flex: 1; padding-bottom: 10px; }
+      .tl-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 20px;
+        font-size: 14px;
+      }
+      .tl-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #F57C00;
+        color: #fff;
+        font-size: 10px;
+        font-weight: 700;
+      }
+      /* Vertical connector between consecutive events; extends past the row
+         padding so the line stays continuous across the gap. */
+      .tl-item:not(:last-child) .tl-rail::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        top: 20px;
+        bottom: -12px;
+        width: 2px;
+        background: var(--divider-color, #e0e0e0);
+      }
+      .tl-main {
+        flex: 1;
+        min-width: 0;
+      }
+      .tl-line {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+      }
       .tl-title { font-weight: 500; }
+      .tl-value {
+        flex-shrink: 0;
+        color: var(--secondary-text-color, #888);
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+      }
       .tl-sub {
+        margin-top: 1px;
+        text-align: right;
         font-size: 12px;
         color: var(--secondary-text-color, #888);
       }
-      .tl-move {
+      .tl-move .tl-title {
         color: var(--secondary-text-color, #888);
         font-style: italic;
+        font-weight: 400;
       }
 
       /* Leaflet popup override */
@@ -794,7 +848,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       : role === 'end'
       ? `🕐 ${fmt(point.time)}`
       : point.count > 1
-      ? `🕐 ${fmt(point.time)} – ${fmt(point.timeTo)}`
+      ? `🕐 ${fmt(point.time)} – ${fmt(point.timeTo)} (${this._fmtDuration(point.timeTo - point.time)})`
       : `🕐 ${fmt(point.time)}`;
     return `
       <div style="min-width:120px">
@@ -940,30 +994,36 @@ class LovelaceTrackHistoryCard extends HTMLElement {
           : `${this._t('stop_n')} ${it.n}`;
         const icon = it.role === 'start' ? '🟢'
           : it.role === 'end' ? '🔴'
-          : `<span style="
-              display:inline-flex;align-items:center;justify-content:center;
-              width:18px;height:18px;border-radius:50%;
-              background:#F57C00;color:#fff;
-              font-size:10px;font-weight:700;
-            ">${it.n}</span>`;
+          : `<span class="tl-badge">${it.n}</span>`;
         // Start → departure (last point); end → arrival (first point);
-        // other stops → the full arrival–departure range.
-        const timeStr = it.role === 'start' ? `🕐 ${fmt(it.timeTo)}`
-          : it.role === 'end' ? `🕐 ${fmt(it.time)}`
-          : `🕐 ${fmt(it.time)} – ${fmt(it.timeTo)}`;
+        // other stops → the full arrival–departure range + dwell duration.
+        const value = it.role === 'start' ? fmt(it.timeTo)
+          : it.role === 'end' ? fmt(it.time)
+          : `${fmt(it.time)} – ${fmt(it.timeTo)}`;
+        const sub = it.role === 'start' || it.role === 'end'
+          ? ''
+          : `<div class="tl-sub">(${this._fmtDuration(it.timeTo - it.time)})</div>`;
         return `
-          <div class="tl-item">
-            <div class="tl-icon">${icon}</div>
-            <div class="tl-body">
-              <div class="tl-title">${title}</div>
-              <div class="tl-sub">${timeStr}</div>
+          <div class="tl-item tl-stop">
+            <div class="tl-rail"><div class="tl-icon">${icon}</div></div>
+            <div class="tl-main">
+              <div class="tl-line">
+                <span class="tl-title">${title}</span>
+                <span class="tl-value">${value}</span>
+              </div>
+              ${sub}
             </div>
           </div>`;
       }
       return `
         <div class="tl-item">
-          <div class="tl-icon">↓</div>
-          <div class="tl-body tl-move">${this._t('moving')} · ~${this._fmtDist(it.dist)}</div>
+          <div class="tl-rail"><div class="tl-icon">↓</div></div>
+          <div class="tl-main">
+            <div class="tl-line tl-move">
+              <span class="tl-title">${this._t('moving')}</span>
+              <span class="tl-value">~${this._fmtDist(it.dist)}</span>
+            </div>
+          </div>
         </div>`;
     }).join('');
 
@@ -1004,6 +1064,18 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
   _fmtDist(km) {
     return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+  }
+
+  // Dwell time for a stop, given a span in milliseconds (Date subtraction)
+  // → "1 h 15 min". "min" (not "m") avoids clashing with metres in distances;
+  // both units read the same across the supported locales.
+  _fmtDuration(ms) {
+    const mins = Math.max(0, Math.round(ms / 60000));
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    if (h && m) return `${h} h ${m} min`;
+    if (h) return `${h} h`;
+    return `${m} min`;
   }
 
   // ── Leaflet CSS injection ─────────────────────────────────────────────────
