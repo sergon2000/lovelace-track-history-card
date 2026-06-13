@@ -1401,18 +1401,16 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     };
   }
 
-  // Compose a label from address components. Detail is relative to the day:
-  // when several stops fall in the same city, show the street to tell them
-  // apart; when a city has a single stop, just "City, Country".
-  _composeAddress(addr, cityCount) {
+  // Compose a label from address components: street level (street + city) for
+  // every stop, falling back to "City, Country" only when there's no street
+  // info at all.
+  _composeAddress(addr) {
     const city = addr.city, country = addr.country;
-    if (cityCount >= 2) {
-      const street = addr.road
-        ? (addr.house_number ? `${addr.road} ${addr.house_number}` : addr.road)
-        : (addr.neighbourhood || addr.suburb);
-      if (street && city) return `${street}, ${city}`;
-      if (street) return street;
-    }
+    const street = addr.road
+      ? (addr.house_number ? `${addr.road} ${addr.house_number}` : addr.road)
+      : (addr.neighbourhood || addr.suburb);
+    if (street && city) return `${street}, ${city}`;
+    if (street) return street;
     if (city && country) return `${city}, ${country}`;
     return city || country || null;
   }
@@ -1470,19 +1468,13 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       });
   }
 
-  // Recompute and write the labels for every stop resolved so far this load.
-  // Done on each arrival so detail can "upgrade" (e.g. a second stop appearing
-  // in a city promotes both from "City" to street level).
+  // Write the labels for every stop resolved so far this load. Each label is
+  // independent of the others, so this is idempotent — re-running it as more
+  // stops resolve simply fills in the new ones.
   _relabelLocations(gen) {
     if (gen !== this._loadGen || !this.shadowRoot) return;
-    const cityCount = new Map();
-    for (const addr of this._geoResolved.values()) {
-      const c = `${addr.city || ''}|${addr.country || ''}`;
-      cityCount.set(c, (cityCount.get(c) || 0) + 1);
-    }
     for (const [key, addr] of this._geoResolved) {
-      const c = `${addr.city || ''}|${addr.country || ''}`;
-      const label = this._composeAddress(addr, cityCount.get(c));
+      const label = this._composeAddress(addr);
       if (!label) continue;
       const text = `(${label})`;
       this.shadowRoot.querySelectorAll(`[data-geo="${key}"]`)

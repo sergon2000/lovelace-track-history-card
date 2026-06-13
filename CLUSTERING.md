@@ -186,16 +186,12 @@ its map popup. The label is resolved in two tiers:
   places and revisited days reuse the cached address instead of calling the
   service again (switching HA's language fetches fresh, correctly-localised names).
 
-### Detail level (`_composeAddress`)
+### Label format (`_composeAddress`)
 
-The cache stores the raw address **components**, not a finished string, because
-the chosen detail depends on the whole day's set of stops:
+Every stop is shown at **street** level — `Street [number], City` — so stops are
+always identifiable. When the response has no street (`road`/`neighbourhood`/
+`suburb`), it falls back to `City, Country`, and finally to whichever of the two
+is present.
 
-- A city with a **single** stop → `City, Country`.
-- A city with **two or more** stops → each shown at **street** level
-  (`Street [number], City`) so they can be told apart.
-
-Because labels appear progressively, the detail can *upgrade* live: a stop first
-shown as `City, Country` is promoted to street level once a second stop in the
-same city resolves (`_relabelLocations` recomputes every resolved stop on each
-arrival).
+The cache stores the raw address **components**, not a finished string, so the
+label can be recomposed (e.g. with different fallbacks) without re-querying.
