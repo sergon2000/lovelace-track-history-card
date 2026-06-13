@@ -760,16 +760,10 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       : point.count > 1
       ? `🕐 ${fmt(point.time)} – ${fmt(point.timeTo)}`
       : `🕐 ${fmt(point.time)}`;
-    const acc = (!point.count || point.count === 1) && point.accuracy
-      ? `<div style="color:#999;font-size:11px">±${Math.round(point.accuracy)} m</div>` : '';
-    const cnt = point.count > 1
-      ? `<div style="color:#999;font-size:11px">${point.count} ${this._t('points')}</div>` : '';
-    const st  = point.state ? `<div style="color:#999;font-size:11px">${point.state}</div>` : '';
     return `
       <div style="min-width:120px">
         ${label ? `<strong>${label}</strong><br>` : ''}
         ${timeHtml}
-        ${cnt}${acc}${st}
       </div>`;
   }
 
@@ -797,7 +791,8 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       iconAnchor: [14, 14],
       popupAnchor: [0, -16],
     });
-    return L.marker([point.lat, point.lng], { icon }).bindPopup(this._popupHtml(point));
+    return L.marker([point.lat, point.lng], { icon })
+      .bindPopup(this._popupHtml(point, `${this._t('stop_n')} ${point.stopNo}`));
   }
 
   _clusterPoints(points, radiusMeters, minPoints = 3) {
