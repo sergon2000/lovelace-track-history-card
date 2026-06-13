@@ -1485,8 +1485,8 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
             <span>${this._t('arrows_lbl')}</span>
           </label>
           <input type="number" id="f-arrow-count" class="text-input"
-            value="${arrowCount}" min="10" max="30" title="${this._t('arrow_count_lbl')}"
-            placeholder="${this._t('arrow_count_lbl')}"
+            value="${arrowCount}" min="10" max="30" title="${this._t('arrow_count_lbl')} (10–30)"
+            placeholder="${this._t('arrow_count_lbl')} (10–30)"
             style="display:${showArrows ? 'block' : 'none'}">
         </div>
 
@@ -1511,19 +1511,19 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
         <details class="advanced" id="advanced" ${this._advancedOpen ? 'open' : ''}>
           <summary>${this._t('advanced_lbl')}</summary>
           <div>
-            <div class="section-label">${this._t('map_height_lbl')}</div>
+            <div class="section-label">${this._t('map_height_lbl')} (200–1000)</div>
             <input type="number" id="f-height" class="text-input" style="margin-top:0"
               value="${map_height}" min="200" max="1000">
           </div>
 
           <div>
-            <div class="section-label">${this._t('cluster_radius_lbl')}</div>
+            <div class="section-label">${this._t('cluster_radius_lbl')} (50–500)</div>
             <input type="number" id="f-cluster-radius" class="text-input" style="margin-top:0"
               value="${clusterRadius}" min="50" max="500">
           </div>
 
           <div>
-            <div class="section-label">${this._t('min_points_lbl')}</div>
+            <div class="section-label">${this._t('min_points_lbl')} (2–5)</div>
             <input type="number" id="f-min-points" class="text-input" style="margin-top:0"
               value="${minPoints}" min="2" max="5">
           </div>
