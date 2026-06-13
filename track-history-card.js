@@ -21,7 +21,6 @@ const LEAFLET_CSS_URL = `https://unpkg.com/leaflet@${LEAFLET_VERSION}/dist/leafl
 
 const TRANSLATIONS = {
   en: {
-    device:         'Device',
     track_of:       'Track of',
     date:           'Date',
     load:           'Load',
@@ -53,7 +52,6 @@ const TRANSLATIONS = {
     default_title:     'Track History',
   },
   es: {
-    device:         'Dispositivo',
     track_of:       'Trayecto de',
     date:           'Fecha',
     load:           'Cargar',
@@ -85,7 +83,6 @@ const TRANSLATIONS = {
     default_title:     'Track History',
   },
   fr: {
-    device:         'Appareil',
     track_of:       'Trajet de',
     date:           'Date',
     load:           'Charger',
@@ -117,7 +114,6 @@ const TRANSLATIONS = {
     default_title:     'Track History',
   },
   de: {
-    device:         'Gerät',
     track_of:       'Verlauf von',
     date:           'Datum',
     load:           'Laden',
@@ -149,7 +145,6 @@ const TRANSLATIONS = {
     default_title:     'Track History',
   },
   it: {
-    device:         'Dispositivo',
     track_of:       'Percorso di',
     date:           'Data',
     load:           'Carica',
@@ -181,7 +176,6 @@ const TRANSLATIONS = {
     default_title:     'Track History',
   },
   pt: {
-    device:         'Dispositivo',
     track_of:       'Trajeto de',
     date:           'Data',
     load:           'Carregar',
