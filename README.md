@@ -98,10 +98,10 @@ min_points: 3
 | `theme` | `string` | `system` | Map theme: `system` (follows the Home Assistant light/dark mode), `light`, or `dark`. |
 | `show_timeline` | `boolean` | `false` | Show a timeline panel below the map listing each stop with its time range and the distance travelled between stops. |
 | `show_arrows` | `boolean` | `true` | Draw direction arrows along the path. Set to `false` to hide them. |
-| `arrow_count` | `number` | `30` | Number of direction arrows, spread evenly by distance along the path. Ignored when `show_arrows` is `false`. |
-| `map_height` | `number` | `400` | Map height in pixels |
-| `cluster_radius` | `number` | `100` | Radius in meters for grouping nearby points into stop clusters. Points outside any cluster are treated as in-transit and are not marked individually. |
-| `min_points` | `number` | `3` | Minimum number of consecutive points within the radius required to form a cluster. Runs shorter than this are treated as in-transit. |
+| `arrow_count` | `number` | `30` | Number of direction arrows, spread evenly by distance along the path (`10`–`30`). Ignored when `show_arrows` is `false`. |
+| `map_height` | `number` | `400` | Map height in pixels (`200`–`1000`) |
+| `cluster_radius` | `number` | `100` | Radius in meters for grouping nearby points into stop clusters (`100`–`500`). Points outside any cluster are treated as in-transit and are not marked individually. |
+| `min_points` | `number` | `3` | Minimum number of consecutive points within the radius required to form a cluster (`2`–`5`). Runs shorter than this are treated as in-transit. |
 
 > See [CLUSTERING.md](CLUSTERING.md) for a detailed explanation of how points are grouped into stops, how the line is smoothed, and how stray points are handled.
 

@@ -1469,7 +1469,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
             <span>${this._t('arrows_lbl')}</span>
           </label>
           <input type="number" id="f-arrow-count" class="text-input"
-            value="${arrowCount}" min="1" max="200" title="${this._t('arrow_count_lbl')}"
+            value="${arrowCount}" min="10" max="30" title="${this._t('arrow_count_lbl')}"
             placeholder="${this._t('arrow_count_lbl')}"
             style="display:${showArrows ? 'block' : 'none'}">
         </div>
@@ -1503,13 +1503,13 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           <div>
             <div class="section-label">${this._t('cluster_radius_lbl')}</div>
             <input type="number" id="f-cluster-radius" class="text-input" style="margin-top:0"
-              value="${clusterRadius}" min="1" max="10000">
+              value="${clusterRadius}" min="100" max="500">
           </div>
 
           <div>
             <div class="section-label">${this._t('min_points_lbl')}</div>
             <input type="number" id="f-min-points" class="text-input" style="margin-top:0"
-              value="${minPoints}" min="2" max="100">
+              value="${minPoints}" min="2" max="5">
           </div>
         </details>
       </div>
@@ -1564,33 +1564,40 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
 
     this.shadowRoot.getElementById('f-arrow-count')
       .addEventListener('change', e => {
-        const v = parseInt(e.target.value, 10);
+        const v = this._clampInt(e.target, 10, 30, 30);
         // 30 is the default, so drop the key when it matches to keep config clean.
-        this._set('arrow_count', (!isNaN(v) && v >= 1 && v !== 30) ? v : null);
+        this._set('arrow_count', v !== 30 ? v : null);
       });
 
     this.shadowRoot.getElementById('f-cluster-radius')
       .addEventListener('change', e => {
-        const v = parseInt(e.target.value, 10);
-        this._set('cluster_radius', (!isNaN(v) && v >= 1) ? v : 100);
+        this._set('cluster_radius', this._clampInt(e.target, 100, 500, 100));
       });
 
     this.shadowRoot.getElementById('f-min-points')
       .addEventListener('change', e => {
-        const v = parseInt(e.target.value, 10);
-        this._set('min_points', (!isNaN(v) && v >= 2) ? v : 3);
+        this._set('min_points', this._clampInt(e.target, 2, 5, 3));
       });
 
     this.shadowRoot.getElementById('f-height')
       .addEventListener('change', e => {
-        const v = parseInt(e.target.value, 10);
-        if (!isNaN(v) && v >= 200) this._set('map_height', v);
+        this._set('map_height', this._clampInt(e.target, 200, 1000, 400));
       });
 
     // Remember the Advanced section's open state so editing a field (which
     // re-renders the editor) doesn't collapse it.
     this.shadowRoot.getElementById('advanced')
       .addEventListener('toggle', e => { this._advancedOpen = e.target.open; });
+  }
+
+  // Parse a number field, clamp it to [min, max] (falling back when empty or
+  // non-numeric), and reflect the corrected value back into the input so a
+  // hand-typed out-of-range value is visibly snapped into range.
+  _clampInt(el, min, max, fallback) {
+    const v = parseInt(el.value, 10);
+    const clamped = isNaN(v) ? fallback : Math.min(max, Math.max(min, v));
+    el.value = clamped;
+    return clamped;
   }
 
   _buildEntityPickers(entities) {
