@@ -713,7 +713,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       const points = await this._fetchPoints(entityId, date);
 
       if (points.length === 0) {
-        this._destroyMap();
+        // Keep the map alive (the opaque "no data" overlay covers it); just
+        // drop the previous track so returning to a day with data is flicker-free.
+        if (this._trackLayer) this._trackLayer.clearLayers();
         this._setNoData(true);
       } else {
         this._setNoData(false);
@@ -800,33 +802,49 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return this._hass?.themes?.darkMode ? 'dark' : 'light';
   }
 
+  // Add the tile layer to the (reused) map, rebuilding it only when the theme
+  // actually changes so the tiles aren't needlessly reloaded on every redraw.
+  _ensureTileLayer(L) {
+    const theme = this._resolveTheme();
+    if (this._tileLayer && this._tileTheme === theme) return;
+    if (this._tileLayer) this._map.removeLayer(this._tileLayer);
+    this._tileLayer = theme === 'dark'
+      ? L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
+          subdomains: 'abcd',
+          maxZoom: 19,
+        })
+      : L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+          maxZoom: 19,
+        });
+    this._tileLayer.addTo(this._map);
+    this._tileTheme = theme;
+  }
+
   _drawTrack(L, points) {
-    this._destroyMap();
-
-    const mapEl = this.shadowRoot.getElementById('map');
-    // Animations disabled: Leaflet's animation internals read `_leaflet_pos`
-    // from map pane elements, which are not accessible across Shadow DOM
-    // boundaries, causing a TypeError during fitBounds/pan animations.
-    this._map = L.map(mapEl, {
-      zoomControl: true,
-      fadeAnimation: false,
-      zoomAnimation: false,
-      markerZoomAnimation: false,
-      wheelPxPerZoomLevel: 250,
-    });
-
-    if (this._resolveTheme() === 'dark') {
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
-        subdomains: 'abcd',
-        maxZoom: 19,
-      }).addTo(this._map);
-    } else {
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-        maxZoom: 19,
-      }).addTo(this._map);
+    // Reuse the map across loads. Tearing it down and rebuilding it on every
+    // date/device change blanks the container and reloads every tile, which
+    // shows as a flicker. Instead the map is created once; on later loads we
+    // only swap the track layers (polyline, markers, arrows), keeping the map
+    // and its (already cached) tiles in place.
+    if (!this._map) {
+      const mapEl = this.shadowRoot.getElementById('map');
+      // Animations disabled: Leaflet's animation internals read `_leaflet_pos`
+      // from map pane elements, which are not accessible across Shadow DOM
+      // boundaries, causing a TypeError during fitBounds/pan animations.
+      this._map = L.map(mapEl, {
+        zoomControl: true,
+        fadeAnimation: false,
+        zoomAnimation: false,
+        markerZoomAnimation: false,
+        wheelPxPerZoomLevel: 250,
+      });
+      this._trackLayer = L.layerGroup().addTo(this._map);
+      this._addRecenterControl(L);
     }
+    this._ensureTileLayer(L);
+    this._trackLayer.clearLayers();
 
     const displayed = this._clusterPoints(points, this._radiusMeters(), this._config.min_points);
     this._numberStops(displayed);
@@ -841,14 +859,14 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     L.polyline(smoothed, {
       color: '#1565C0', weight: 5, opacity: 0.85,
       lineJoin: 'round', lineCap: 'round',
-    }).addTo(this._map);
+    }).addTo(this._trackLayer);
     // Arrows follow the same smoothed geometry so they sit on the drawn line.
     if (this._config.show_arrows !== false) this._addArrows(L, smoothed);
 
     // Intermediate stop markers, numbered. The first/last stops get the
     // green/end pins below; in-transit points are represented by the line only.
     displayed.forEach(p => {
-      if (p.stopRole === 'mid') this._clusterMarker(L, p).addTo(this._map);
+      if (p.stopRole === 'mid') this._clusterMarker(L, p).addTo(this._trackLayer);
     });
 
     // Start/end markers. If both fall within the cluster radius (e.g. a day
@@ -860,17 +878,16 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       && this._haversine(startP, endP) * 1000 <= this._radiusMeters();
 
     if (sameZone) {
-      this._startEndMarker(L, startP, endP).addTo(this._map);
+      this._startEndMarker(L, startP, endP).addTo(this._trackLayer);
     } else {
-      this._pinMarker(L, startP, '#2E7D32', this._t('start'), 'start').addTo(this._map);
+      this._pinMarker(L, startP, '#2E7D32', this._t('start'), 'start').addTo(this._trackLayer);
       if (displayed.length > 1) {
-        this._pinMarker(L, endP, '#C62828', this._t('end'), 'end').addTo(this._map);
+        this._pinMarker(L, endP, '#C62828', this._t('end'), 'end').addTo(this._trackLayer);
       }
     }
 
     this._bounds = L.latLngBounds(latlngs);
     this._map.fitBounds(this._bounds, { padding: [32, 32], animate: false });
-    this._addRecenterControl(L);
     return displayed;
   }
 
@@ -1056,6 +1073,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       try { this._map.stop(); this._map.remove(); } catch (_) { /* ignore Shadow DOM cleanup errors */ }
       this._map = null;
     }
+    this._trackLayer = null;
+    this._tileLayer = null;
+    this._tileTheme = null;
   }
 
   // ── UI helpers ────────────────────────────────────────────────────────────
@@ -1344,7 +1364,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
           // Keep arrows below stop/start/end markers (Leaflet otherwise stacks
           // markers by latitude, so an arrow could cover a cluster marker).
           zIndexOffset: -1000,
-        }).addTo(this._map);
+        }).addTo(this._trackLayer);
       }
     }
   }
