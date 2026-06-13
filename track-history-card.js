@@ -848,7 +848,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       : role === 'end'
       ? `🕐 ${fmt(point.time)}`
       : point.count > 1
-      ? `🕐 ${fmt(point.time)} – ${fmt(point.timeTo)}`
+      ? `🕐 ${fmt(point.time)} – ${fmt(point.timeTo)} (${this._fmtDuration(point.timeTo - point.time)})`
       : `🕐 ${fmt(point.time)}`;
     return `
       <div style="min-width:120px">
