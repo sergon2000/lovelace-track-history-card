@@ -449,8 +449,8 @@ class LovelaceTrackHistoryCard extends HTMLElement {
               <div class="date-nav">
                 <button type="button" class="date-nav-btn" id="date-prev">&#8249;</button>
                 <div class="date-field">
-                  <input type="date" id="date-picker" value="${selDate}" max="${today}" />
-                  <span class="date-display" id="date-display">${this._fmtDate(selDate)}</span>
+                  <button type="button" class="date-display" id="date-display">${this._fmtDate(selDate)}</button>
+                  <input type="date" id="date-picker" value="${selDate}" max="${today}" tabindex="-1" aria-hidden="true" />
                 </div>
                 <button type="button" class="date-nav-btn" id="date-next" ${selDate >= today ? 'disabled' : ''}>&#8250;</button>
               </div>
@@ -483,6 +483,12 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       this._onLoad();
     };
     datePicker.addEventListener('change', applyDate);
+    // The visible button just opens the native calendar; the input itself is
+    // hidden so its browser-locale text never shows.
+    dateDisplay.addEventListener('click', () => {
+      if (typeof datePicker.showPicker === 'function') datePicker.showPicker();
+      else { datePicker.focus(); datePicker.click(); }
+    });
     this.shadowRoot.getElementById('date-prev')
       .addEventListener('click', () => {
         const d = new Date(datePicker.value + 'T12:00:00');
@@ -540,27 +546,16 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         gap: 4px;
       }
       .date-field { position: relative; flex: 1; }
-      /* Hide the input's own (browser-locale) text; the overlay shows the date
-         in the user's HA format. The calendar picker indicator stays visible
-         and clickable (the overlay is pointer-events:none). */
-      .date-field input[type="date"] { color: transparent; }
-      /* While editing, reveal the native input and hide our overlay so the two
-         don't overlap; the overlay returns (in the HA format) on blur. */
-      .date-field:focus-within input[type="date"] { color: var(--primary-text-color, #333); }
-      .date-field:focus-within .date-display { display: none; }
-      .date-display {
+      /* The visible field is a button showing the date in the user's HA format;
+         the native <input type="date"> below is invisible and only used to open
+         the calendar picker (showPicker), so the browser-locale text is never
+         shown. */
+      .date-field .date-display { cursor: pointer; font-family: inherit; }
+      .date-field input[type="date"] {
         position: absolute;
         inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        /* Leave room for the calendar picker indicator on the right so the
-           text stays centred over the visible field, not the whole box. */
-        padding-right: 20px;
-        box-sizing: border-box;
+        opacity: 0;
         pointer-events: none;
-        font-size: 14px;
-        color: var(--primary-text-color, #333);
       }
       .date-nav-btn {
         flex-shrink: 0;
@@ -578,7 +573,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       }
       .date-nav-btn:hover:not(:disabled) { opacity: 0.7; }
       .date-nav-btn:disabled { opacity: 0.3; cursor: default; }
-      select, input[type="date"] {
+      select, input[type="date"], .date-display {
         padding: 8px 10px;
         border: 1px solid var(--divider-color, #e0e0e0);
         border-radius: 6px;
