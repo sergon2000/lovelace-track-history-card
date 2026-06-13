@@ -269,7 +269,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { entities: [], map_height: 400, cluster_radius: 100, min_points: 3, theme: 'system' };
+    return { entities: [], map_height: 450, cluster_radius: 100, min_points: 3, theme: 'system' };
   }
 
   setConfig(config) {
@@ -277,7 +277,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       throw new Error('[lovelace-track-history-card] "entities" must be a non-empty list of device_tracker entity IDs.');
     }
     this._config = {
-      map_height: 400,
+      map_height: 450,
       default_entity: null,
       cluster_radius: 100,
       min_points: 3,
@@ -1289,7 +1289,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
   }
 
   _render() {
-    const { entities = [], default_entity = '', map_height = 400 } = this._config;
+    const { entities = [], default_entity = '', map_height = 450 } = this._config;
     const hasTitle      = this._showTitle;
     const titleValue    = this._config.title || '';
     const hasDefault    = !!this._config.default_entity;

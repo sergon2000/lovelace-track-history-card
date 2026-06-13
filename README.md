@@ -96,7 +96,7 @@ min_points: 3
 | `default_entity` | `string` | first entity | Entity pre-selected in the dropdown on load. Must be present in `entities`. If omitted or not found, the first entity is used. |
 | `theme` | `string` | `system` | Map theme: `system` (follows the Home Assistant light/dark mode), `light`, or `dark`. |
 | `show_timeline` | `boolean` | `false` | Show a timeline panel below the map listing each stop with its time range and the distance travelled between stops. |
-| `map_height` | `number` | `400` | Map height in pixels |
+| `map_height` | `number` | `450` | Map height in pixels |
 | `units` | `string` | `metric` | Unit system for distances: `metric` (m / km) or `imperial` (ft / mi). Also sets the unit of `cluster_radius`. |
 | `cluster_radius` | `number` | `100` | Radius for grouping nearby points into stop clusters, in the configured `units` (meters when `metric`, feet when `imperial`). Points outside any cluster are treated as in-transit and are not marked individually. |
 | `min_points` | `number` | `3` | Minimum number of consecutive points within the radius required to form a cluster. Runs shorter than this are treated as in-transit. |
