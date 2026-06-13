@@ -156,3 +156,42 @@ the same `displayed` array:
 - **Moving** — between consecutive stops (and before/after the first/last stop
   when there are in-transit points), showing the distance travelled along that
   segment. Distances under 1 km are shown in metres, otherwise in kilometres.
+
+## Location enrichment (`_zoneName` / reverse geocoding)
+
+Each stop can be labelled with where it is, shown both in its timeline entry and
+its map popup. The label is resolved in two tiers:
+
+1. **HA zone** (`_zoneName`) — if the stop falls inside a `zone.*` entity, that
+   zone's name is used. Smallest zone wins when several overlap. This is local
+   and instant, so it always takes precedence.
+2. **Reverse geocoding** (opt-in, `reverse_geocode: true`) — stops with *no*
+   zone are looked up against an online service (`_reverseGeocode`, Nominatim by
+   default or any compatible `geocode_url`).
+
+### How the geocoding runs
+
+- The map, markers and timeline render immediately; geocoding happens in the
+  background and the labels are filled in as answers arrive — never blocking the
+  draw.
+- Lookups are **serialised** with a ~1.1 s gap (`GEO_MIN_GAP_MS`) to respect
+  Nominatim's ~1 req/sec policy. Only stops are looked up, never in-transit
+  points. Each load gets a generation token (`_loadGen`); answers from a previous
+  day/device are discarded so a late response can't land on the new track.
+- Results are cached in `localStorage` for 90 days (`GEO_TTL_MS`), keyed by the
+  stop's coordinates rounded to ~11 m, so recurring places and revisited days
+  reuse the cached address instead of calling the service again.
+
+### Detail level (`_composeAddress`)
+
+The cache stores the raw address **components**, not a finished string, because
+the chosen detail depends on the whole day's set of stops:
+
+- A city with a **single** stop → `City, Country`.
+- A city with **two or more** stops → each shown at **street** level
+  (`Street [number], City`) so they can be told apart.
+
+Because labels appear progressively, the detail can *upgrade* live: a stop first
+shown as `City, Country` is promoted to street level once a second stop in the
+same city resolves (`_relabelLocations` recomputes every resolved stop on each
+arrival).

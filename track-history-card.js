@@ -20,6 +20,15 @@ const LEAFLET_VERSION = '1.9.4';
 const LEAFLET_JS_URL = `https://unpkg.com/leaflet@${LEAFLET_VERSION}/dist/leaflet.js`;
 const LEAFLET_CSS_URL = `https://unpkg.com/leaflet@${LEAFLET_VERSION}/dist/leaflet.css`;
 
+// Reverse geocoding (opt-in). Default endpoint is Nominatim; `geocode_url` may
+// point at any Nominatim-compatible reverse endpoint (LocationIQ, self-hosted).
+// Nominatim's usage policy caps requests at ~1/sec, so calls are serialised
+// (GEO_MIN_GAP_MS) and results cached in localStorage for GEO_TTL_MS.
+const NOMINATIM_REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse';
+const GEO_MIN_GAP_MS = 1100;
+const GEO_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
+const GEO_CACHE_PREFIX = 'thc:geo:';
+
 // Numeric config limits — the single source of truth for each field's default
 // and the range enforced in setConfig, the editor inputs and the editor labels.
 // Change a value here and it propagates everywhere.
@@ -53,6 +62,7 @@ const TRANSLATIONS = {
     remove:            'Remove',
     cluster_radius_lbl:'Cluster radius',
     min_points_lbl:    'Minimum points per cluster',
+    reverse_geocode_lbl: 'Reverse geocoding (address for stops outside zones)',
     units_lbl:         'Units',
     units_metric:      'Metric',
     units_imperial:    'Imperial',
@@ -89,6 +99,7 @@ const TRANSLATIONS = {
     remove:            'Eliminar',
     cluster_radius_lbl:'Radio de agrupación',
     min_points_lbl:    'Puntos mínimos por agrupación',
+    reverse_geocode_lbl: 'Geocodificación inversa (dirección de paradas fuera de zonas)',
     units_lbl:         'Sistema de medida',
     units_metric:      'Métrico',
     units_imperial:    'Imperial',
@@ -125,6 +136,7 @@ const TRANSLATIONS = {
     remove:            'Supprimer',
     cluster_radius_lbl:'Rayon de regroupement',
     min_points_lbl:    'Points minimum par regroupement',
+    reverse_geocode_lbl: 'Géocodage inversé (adresse des arrêts hors zones)',
     units_lbl:         'Unités',
     units_metric:      'Métrique',
     units_imperial:    'Impérial',
@@ -161,6 +173,7 @@ const TRANSLATIONS = {
     remove:            'Entfernen',
     cluster_radius_lbl:'Gruppierungsradius',
     min_points_lbl:    'Mindestpunkte pro Gruppierung',
+    reverse_geocode_lbl: 'Reverse-Geocoding (Adresse für Stopps außerhalb von Zonen)',
     units_lbl:         'Einheiten',
     units_metric:      'Metrisch',
     units_imperial:    'Imperial',
@@ -197,6 +210,7 @@ const TRANSLATIONS = {
     remove:            'Rimuovi',
     cluster_radius_lbl:'Raggio di raggruppamento',
     min_points_lbl:    'Punti minimi per raggruppamento',
+    reverse_geocode_lbl: 'Geocodifica inversa (indirizzo delle soste fuori dalle zone)',
     units_lbl:         'Unità di misura',
     units_metric:      'Metrico',
     units_imperial:    'Imperiale',
@@ -233,6 +247,7 @@ const TRANSLATIONS = {
     remove:            'Remover',
     cluster_radius_lbl:'Raio de agrupamento',
     min_points_lbl:    'Pontos mínimos por agrupamento',
+    reverse_geocode_lbl: 'Geocodificação inversa (endereço de paradas fora das zonas)',
     units_lbl:         'Unidades',
     units_metric:      'Métrico',
     units_imperial:    'Imperial',
@@ -284,6 +299,15 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     this._hass = null;
     this._leafletCssInjected = false;
     this._autoLoaded = false;
+    // Reverse-geocoding state. `_loadGen` is bumped on every load so responses
+    // that arrive after the user changed day/device are discarded. `_geoMarkers`
+    // maps a stop's rounded-coordinate key → the marker popup rebuilders, and
+    // `_geoResolved` holds the address components resolved so far this load.
+    this._loadGen = 0;
+    this._geoQueue = [];
+    this._geoBusy = false;
+    this._geoResolved = new Map();
+    this._geoMarkers = new Map();
   }
 
   // ── HA lifecycle ──────────────────────────────────────────────────────────
@@ -743,6 +767,12 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const date     = this.shadowRoot.getElementById('date-picker').value;
     if (!entityId || !date) return;
 
+    // New load generation: abort any pending geocoding from the previous
+    // day/device so a late address can't be written onto the new track.
+    const gen = ++this._loadGen;
+    this._geoQueue = [];
+    this._geoResolved = new Map();
+
     // Keep the date overlay in sync with the locale (the first build can run
     // before `hass` — and thus the user's date_format — is available).
     const dateDisplay = this.shadowRoot.getElementById('date-display');
@@ -770,6 +800,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         const displayed = this._drawTrack(L, points);
         this._setSummary(points);
         this._setTimeline(displayed);
+        this._enrichLocations(displayed, gen);
       }
     } catch (err) {
       console.error('[lovelace-track-history-card]', err);
@@ -898,6 +929,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     }
     this._ensureTileLayer(L);
     this._trackLayer.clearLayers();
+    // Stop markers are re-created each draw, so drop the previous load's popup
+    // rebuilders before registering the new ones.
+    this._geoMarkers = new Map();
 
     const displayed = this._clusterPoints(points, this._radiusMeters(), this._config.min_points);
     this._numberStops(displayed);
@@ -935,15 +969,25 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     // Intermediate stop markers, numbered. The first/last stops get the
     // green/end pins below; in-transit points are represented by the line only.
     displayed.forEach(p => {
-      if (p.stopRole === 'mid') this._clusterMarker(L, p).addTo(this._trackLayer);
+      if (p.stopRole === 'mid') {
+        const m = this._clusterMarker(L, p);
+        m.addTo(this._trackLayer);
+        this._registerGeoMarker(p, m, loc => this._popupHtml(p, `${this._t('stop_n')} ${p.stopNo}`, '', loc));
+      }
     });
 
     if (sameZone) {
-      this._startEndMarker(L, startP, endP).addTo(this._trackLayer);
+      const m = this._startEndMarker(L, startP, endP);
+      m.addTo(this._trackLayer);
+      this._registerGeoMarker(startP, m, loc => this._startEndPopup(startP, endP, loc));
     } else {
-      this._pinMarker(L, startP, '#2E7D32', this._t('start'), 'start').addTo(this._trackLayer);
+      const ms = this._pinMarker(L, startP, '#2E7D32', this._t('start'), 'start');
+      ms.addTo(this._trackLayer);
+      this._registerGeoMarker(startP, ms, loc => this._popupHtml(startP, this._t('start'), 'start', loc));
       if (displayed.length > 1) {
-        this._pinMarker(L, endP, '#C62828', this._t('end'), 'end').addTo(this._trackLayer);
+        const me = this._pinMarker(L, endP, '#C62828', this._t('end'), 'end');
+        me.addTo(this._trackLayer);
+        this._registerGeoMarker(endP, me, loc => this._popupHtml(endP, this._t('end'), 'end', loc));
       }
     }
 
@@ -998,7 +1042,6 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   _startEndMarker(L, startP, endP) {
-    const fmt = t => this._fmtTime(t);
     const icon = L.divIcon({
       html: `<div style="
         width:26px;height:26px;border-radius:50%;
@@ -1011,24 +1054,32 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       iconAnchor: [13, 13],
       popupAnchor: [0, -16],
     });
-    // Start and end coincide here, so they share a zone — show it once, first.
-    const zone = this._zoneName(startP);
-    const popup = `
+    // Place it at the midpoint so it sits between the two coincident points.
+    const mid = [(startP.lat + endP.lat) / 2, (startP.lng + endP.lng) / 2];
+    return L.marker(mid, { icon }).bindPopup(this._startEndPopup(startP, endP));
+  }
+
+  // Popup for the combined start/end marker. `loc` overrides the location line
+  // (used when a reverse-geocoded address arrives); undefined falls back to the
+  // HA zone. Start and end coincide here, so the location is shown once, first.
+  _startEndPopup(startP, endP, loc) {
+    const fmt = t => this._fmtTime(t);
+    const where = loc !== undefined ? loc : this._zoneName(startP);
+    return `
       <div style="min-width:120px">
-        ${zone ? `<strong>(${zone})</strong><br>` : ''}
+        ${where ? `<strong>(${where})</strong><br>` : ''}
         <strong>${this._t('start')}</strong> 🕐 ${fmt(startP.timeTo ?? startP.time)}<br>
         <strong>${this._t('end')}</strong> 🕐 ${fmt(endP.time)}
       </div>`;
-    // Place it at the midpoint so it sits between the two coincident points.
-    const mid = [(startP.lat + endP.lat) / 2, (startP.lng + endP.lng) / 2];
-    return L.marker(mid, { icon }).bindPopup(popup);
   }
 
-  _popupHtml(point, label = '', role = '') {
+  _popupHtml(point, label = '', role = '', loc) {
     const fmt = t => this._fmtTime(t);
-    // Zone (if any) is appended in parentheses right after the label.
-    const zone = this._zoneName(point);
-    const labelText = label && zone ? `${label} (${zone})` : label;
+    // Location (if any) is appended in parentheses right after the label. `loc`
+    // overrides it with a reverse-geocoded address; undefined falls back to the
+    // HA zone.
+    const where = loc !== undefined ? loc : this._zoneName(point);
+    const labelText = label && where ? `${label} (${where})` : label;
     // Start stop → departure time (last point); end stop → arrival time
     // (first point); other stops → the full arrival–departure range.
     const timeHtml = role === 'start'
@@ -1137,6 +1188,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     this._trackLayer = null;
     this._tileLayer = null;
     this._tileTheme = null;
+    this._geoQueue = [];
+    this._geoResolved = new Map();
+    this._geoMarkers = new Map();
   }
 
   // ── UI helpers ────────────────────────────────────────────────────────────
@@ -1181,11 +1235,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const rows = items.map(it => {
       if (it.type === 'stop') {
         const isStartEnd = it.role === 'start' || it.role === 'end';
-        let title = it.role === 'start' ? this._t('start')
+        const title = it.role === 'start' ? this._t('start')
           : it.role === 'end' ? this._t('end')
           : `${this._t('stop_n')} ${it.n}`;
-        // Start/end show the zone inline, right after the word Start / End.
-        if (isStartEnd && it.zone) title += ` (${it.zone})`;
         const icon = it.role === 'start' ? '🟢'
           : it.role === 'end' ? '🔴'
           : `<span class="tl-badge">${it.n}</span>`;
@@ -1194,19 +1246,25 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         const value = it.role === 'start' ? fmt(it.timeTo)
           : it.role === 'end' ? fmt(it.time)
           : `${fmt(it.time)} – ${fmt(it.timeTo)}`;
-        // Mid stops carry the zone (when any) on its own line under the title,
-        // above the dwell duration.
-        // Mid stops: zone (left, styled like the title) and dwell duration
-        // (right, muted) share one line.
+        // The location label (zone, or a reverse-geocoded address filled in
+        // later) lives in a span addressable by the stop's coordinate key, so
+        // it can be updated in place without re-rendering the timeline. Start/end
+        // show it inline after the word; mid stops on the subline next to the
+        // dwell duration. Both share the `(…)` format so the async fill is uniform.
+        const geoKey = this._geoKey(it);
+        const locText = it.zone ? `(${it.zone})` : '';
+        const titleHtml = isStartEnd
+          ? `${title} <span class="tl-loc" data-geo="${geoKey}">${locText}</span>`
+          : title;
         const sub = isStartEnd
           ? ''
-          : `<div class="tl-subline"><span class="tl-zone">${it.zone ? `(${it.zone})` : ''}</span><span class="tl-sub">(${this._fmtDuration(it.timeTo - it.time)})</span></div>`;
+          : `<div class="tl-subline"><span class="tl-zone" data-geo="${geoKey}">${locText}</span><span class="tl-sub">(${this._fmtDuration(it.timeTo - it.time)})</span></div>`;
         return `
           <div class="tl-item tl-stop">
             <div class="tl-rail"><div class="tl-icon">${icon}</div></div>
             <div class="tl-main">
               <div class="tl-line">
-                <span class="tl-title">${title}</span>
+                <span class="tl-title">${titleHtml}</span>
                 <span class="tl-value">${value}</span>
               </div>
               ${sub}
@@ -1249,7 +1307,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
     stops.forEach((idx, s) => {
       const p = displayed[idx];
-      items.push({ type: 'stop', n: p.stopNo, role: p.stopRole, time: p.time, timeTo: p.timeTo, zone: this._zoneName(p) });
+      items.push({ type: 'stop', n: p.stopNo, role: p.stopRole, time: p.time, timeTo: p.timeTo, zone: this._zoneName(p), lat: p.lat, lng: p.lng });
       if (s < stops.length - 1) items.push({ type: 'move', dist: segDist(idx, stops[s + 1]) });
     });
 
@@ -1286,6 +1344,142 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       }
     }
     return best ? best.name : null;
+  }
+
+  // ── Reverse geocoding (opt-in) ──────────────────────────────────────────────
+
+  // A stop's stable key: its coordinates rounded to ~11 m. Used both as the
+  // localStorage cache key and to address the timeline span / marker for a stop,
+  // so recurring places (home, gym) reuse the same cached address.
+  _geoKey(p) {
+    return `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
+  }
+
+  _geoCacheGet(key) {
+    try {
+      const raw = localStorage.getItem(GEO_CACHE_PREFIX + key);
+      if (!raw) return null;
+      const o = JSON.parse(raw);
+      if (!o || !o.addr || (Date.now() - o.ts) > GEO_TTL_MS) return null;
+      return o.addr;
+    } catch (_) { return null; }
+  }
+
+  _geoCacheSet(key, addr) {
+    try {
+      localStorage.setItem(GEO_CACHE_PREFIX + key, JSON.stringify({ addr, ts: Date.now() }));
+    } catch (_) { /* storage disabled / full — degrade to no cache */ }
+  }
+
+  // Query the reverse-geocoding endpoint for a point and return the address
+  // components we care about (not a finished string — the label depends on how
+  // many of the day's stops share the same city, computed at relabel time).
+  async _reverseGeocode(lat, lng) {
+    const base = this._config.geocode_url || NOMINATIM_REVERSE_URL;
+    const sep = base.includes('?') ? '&' : '?';
+    const url = `${base}${sep}format=jsonv2&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`;
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const a = json && json.address;
+    if (!a) return null;
+    return {
+      road: a.road, house_number: a.house_number,
+      neighbourhood: a.neighbourhood, suburb: a.suburb,
+      city: a.city || a.town || a.village || a.municipality,
+      country: a.country,
+    };
+  }
+
+  // Compose a label from address components. Detail is relative to the day:
+  // when several stops fall in the same city, show the street to tell them
+  // apart; when a city has a single stop, just "City, Country".
+  _composeAddress(addr, cityCount) {
+    const city = addr.city, country = addr.country;
+    if (cityCount >= 2) {
+      const street = addr.road
+        ? (addr.house_number ? `${addr.road} ${addr.house_number}` : addr.road)
+        : (addr.neighbourhood || addr.suburb);
+      if (street && city) return `${street}, ${city}`;
+      if (street) return street;
+    }
+    if (city && country) return `${city}, ${country}`;
+    return city || country || null;
+  }
+
+  // Record a stop's marker so its popup location line can be refreshed in place
+  // when an address arrives. `rebuild(label)` returns the new popup HTML.
+  _registerGeoMarker(point, marker, rebuild) {
+    const key = this._geoKey(point);
+    if (!this._geoMarkers.has(key)) this._geoMarkers.set(key, []);
+    this._geoMarkers.get(key).push({ marker, rebuild });
+  }
+
+  // Kick off reverse geocoding for the stops that have no HA zone (zones win and
+  // are instant). Cache hits apply immediately; misses go through the throttled
+  // queue. `gen` ties every result to this load so stale ones are dropped.
+  _enrichLocations(displayed, gen) {
+    if (!this._config.reverse_geocode) return;
+    const seen = new Set();
+    for (const p of displayed) {
+      if (p.count <= 1 || this._zoneName(p)) continue;
+      const key = this._geoKey(p);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const cached = this._geoCacheGet(key);
+      if (cached) this._geoResolved.set(key, cached);
+      else this._geoQueue.push({ lat: p.lat, lng: p.lng, key, gen });
+    }
+    this._relabelLocations(gen); // paint cache hits right away
+    this._drainGeoQueue();
+  }
+
+  // Process one queued geocode at a time, leaving GEO_MIN_GAP_MS between network
+  // calls to respect Nominatim's ~1/sec policy. Stale jobs are dropped without
+  // a network call.
+  _drainGeoQueue() {
+    if (this._geoBusy) return;
+    let job = null;
+    while (this._geoQueue.length) {
+      const next = this._geoQueue.shift();
+      if (next.gen === this._loadGen) { job = next; break; }
+    }
+    if (!job) return;
+    this._geoBusy = true;
+    this._reverseGeocode(job.lat, job.lng)
+      .then(addr => {
+        if (addr && job.gen === this._loadGen) {
+          this._geoCacheSet(job.key, addr);
+          this._geoResolved.set(job.key, addr);
+          this._relabelLocations(job.gen);
+        }
+      })
+      .catch(() => { /* ignore a failed lookup; other stops still resolve */ })
+      .finally(() => {
+        setTimeout(() => { this._geoBusy = false; this._drainGeoQueue(); }, GEO_MIN_GAP_MS);
+      });
+  }
+
+  // Recompute and write the labels for every stop resolved so far this load.
+  // Done on each arrival so detail can "upgrade" (e.g. a second stop appearing
+  // in a city promotes both from "City" to street level).
+  _relabelLocations(gen) {
+    if (gen !== this._loadGen || !this.shadowRoot) return;
+    const cityCount = new Map();
+    for (const addr of this._geoResolved.values()) {
+      const c = `${addr.city || ''}|${addr.country || ''}`;
+      cityCount.set(c, (cityCount.get(c) || 0) + 1);
+    }
+    for (const [key, addr] of this._geoResolved) {
+      const c = `${addr.city || ''}|${addr.country || ''}`;
+      const label = this._composeAddress(addr, cityCount.get(c));
+      if (!label) continue;
+      const text = `(${label})`;
+      this.shadowRoot.querySelectorAll(`[data-geo="${key}"]`)
+        .forEach(el => { el.textContent = text; });
+      const markers = this._geoMarkers.get(key);
+      if (markers) markers.forEach(m => m.marker.setPopupContent(m.rebuild(label)));
+    }
   }
 
   // The cluster radius is entered in the configured units (m or ft) but the
@@ -1496,6 +1690,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     const arrowCount    = this._config.arrow_count ?? LIMITS.arrow_count.def;
     const unitsValue    = this._config.units || 'metric';
     const unitSuffix    = unitsValue === 'imperial' ? 'ft' : 'm';
+    const reverseGeo    = !!this._config.reverse_geocode;
     // "(min–max)" suffix appended to each numeric field's label/placeholder.
     const range = (k) => `(${LIMITS[k].min}–${LIMITS[k].max})`;
 
@@ -1708,6 +1903,13 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
             <input type="number" id="f-min-points" class="text-input" style="margin-top:0"
               value="${minPoints}" min="${LIMITS.min_points.min}" max="${LIMITS.min_points.max}">
           </div>
+
+          <div>
+            <label class="check-label">
+              <input type="checkbox" id="geo-check" ${reverseGeo ? 'checked' : ''}>
+              <span>${this._t('reverse_geocode_lbl')}</span>
+            </label>
+          </div>
         </details>
       </div>
     `;
@@ -1780,6 +1982,9 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
       .addEventListener('change', e => {
         this._set('min_points', this._clampInt(e.target, LIMITS.min_points));
       });
+
+    this.shadowRoot.getElementById('geo-check')
+      .addEventListener('change', e => this._set('reverse_geocode', e.target.checked ? true : null));
 
     this.shadowRoot.getElementById('f-height')
       .addEventListener('change', e => {

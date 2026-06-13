@@ -60,6 +60,8 @@ shadowRoot (`_injectLeafletCss`).
 | `units`          | `metric`    | `metric` (m/km) or `imperial` (ft/mi). Sets `cluster_radius` unit too. |
 | `cluster_radius` | `200`       | In `units` (m / ft), range 50–500. Converted to metres internally. See CLUSTERING.md. |
 | `min_points`     | `3`         | Min consecutive points for a stop (range 2–5). See CLUSTERING.md. |
+| `reverse_geocode`| `false`     | Opt-in: address-label stops outside any HA zone via reverse geocoding. See gotcha below + CLUSTERING.md. |
+| `geocode_url`    | Nominatim   | Reverse endpoint (Nominatim-compatible). Default `https://nominatim.openstreetmap.org/reverse`. |
 
 ## Gotchas & decisions (read before changing related code)
 
@@ -106,6 +108,30 @@ shadowRoot (`_injectLeafletCss`).
   When start & end are within `cluster_radius` of each other, a single
   half-green/half-red marker is shown. Stop popups show a title (Start / Stop N /
   End) + time(s); start shows departure, end shows arrival, mid shows the range.
+
+### Reverse geocoding (opt-in)
+- **Opt-in only** (`reverse_geocode`, default off) — it sends the user's stop
+  coordinates to an external service, so it must be a conscious choice.
+- **Zones win**: only stops where `_zoneName` returns null are geocoded; HA zones
+  are local/instant and always take precedence.
+- **Non-blocking + cancellable**: the track draws immediately; labels are filled
+  in by `_relabelLocations` as answers arrive. Every load bumps `_loadGen`; jobs
+  carry it and stale answers are dropped (mirrors the flicker-era "late response
+  pisa estado nuevo" guard).
+- **Throttle**: lookups are serialised with a ~1.1 s gap (`GEO_MIN_GAP_MS`) for
+  Nominatim's ~1 req/sec policy. Only stops are looked up, never in-transit.
+- **Browser can't set `User-Agent`** (forbidden header) — Nominatim's policy
+  wants an identifiable client; the HA page `Referer` is what it gets. Nominatim
+  sends `Access-Control-Allow-Origin: *`, so browser `fetch` works (no CORS proxy).
+- **Cache**: `localStorage`, key `thc:geo:<lat4,lng4>` (~11 m), TTL 90 days
+  (`GEO_TTL_MS`). Stores raw address **components**, not the final string —
+  detail is context-dependent (see next point). Per browser/device.
+- **Context-dependent detail** (`_composeAddress`): a city with one stop →
+  `City, Country`; a city with ≥2 stops → street level. So labels can *upgrade*
+  live as more stops in the same city resolve.
+- The timeline location span and the marker popup are updated **in place**
+  (addressed by the stop's rounded-coord key via `data-geo` / `_geoMarkers`) — no
+  re-render, to avoid reintroducing flicker.
 
 ### i18n
 - `TRANSLATIONS` covers `en, es, fr, de, it, pt`; `getLang` takes the base code
