@@ -288,6 +288,24 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return TRANSLATIONS[getLang(this._hass)][key];
   }
 
+  // Human-readable label for a device_tracker in the selector. If the tracker
+  // belongs to a `person` that is linked to a Home Assistant user, show that
+  // person's name; otherwise fall back to the tracker's friendly_name and
+  // finally a title-cased entity id.
+  _deviceLabel(entityId) {
+    const states = this._hass?.states || {};
+    for (const id in states) {
+      if (!id.startsWith('person.')) continue;
+      const attrs = states[id].attributes || {};
+      if (attrs.user_id && Array.isArray(attrs.device_trackers)
+          && attrs.device_trackers.includes(entityId)) {
+        return attrs.friendly_name || id.replace('person.', '');
+      }
+    }
+    return states[entityId]?.attributes?.friendly_name
+      || entityId.replace('device_tracker.', '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
   // Format a time honouring the user's HA profile settings (12/24h + language).
   _fmtTime(t) {
     const locale = this._hass?.locale;
@@ -322,8 +340,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
               <label>${this._t('device')}</label>
               <select id="entity-select">
                 ${this._config.entities.map(e => {
-                  const label = this._hass?.states[e]?.attributes?.friendly_name
-                    || e.replace('device_tracker.', '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                  const label = this._deviceLabel(e);
                   const selected = e === selEntity ? ' selected' : '';
                   return `<option value="${e}"${selected}>${label}</option>`;
                 }).join('')}
