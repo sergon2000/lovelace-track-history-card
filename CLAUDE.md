@@ -130,8 +130,9 @@ shadowRoot (`_injectLeafletCss`).
   days (`GEO_TTL_MS`). Language-scoped so switching HA's language doesn't reuse
   the previous language's labels. Stores raw address **components**, not the
   final string — detail is context-dependent (see next point). Per browser/device.
-- **Label format** (`_composeAddress`): always street level (`Street [number],
-  City`), falling back to `City, Country` only when there's no street info.
+- **Label format** (`_composeAddress`): always street level with the ISO country
+  code, `Street [number], City (CC)` (e.g. `Main St, Madrid (ES)`); falls back to
+  `City (CC)` when there's no street info, then the country name alone.
 - The timeline location span and the marker popup are updated **in place**
   (addressed by the stop's rounded-coord key via `data-geo` / `_geoMarkers`) — no
   re-render, to avoid reintroducing flicker.

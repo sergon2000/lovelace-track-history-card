@@ -1397,22 +1397,23 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       road: a.road, house_number: a.house_number,
       neighbourhood: a.neighbourhood, suburb: a.suburb,
       city: a.city || a.town || a.village || a.municipality,
-      country: a.country,
+      country: a.country, country_code: a.country_code,
     };
   }
 
   // Compose a label from address components: street level (street + city) for
-  // every stop, falling back to "City, Country" only when there's no street
-  // info at all.
+  // every stop, falling back to just the city when there's no street info, with
+  // the ISO country code appended in parentheses — e.g. "Main St, Madrid (ES)".
   _composeAddress(addr) {
-    const city = addr.city, country = addr.country;
+    const city = addr.city;
+    const cc = addr.country_code ? ` (${addr.country_code.toUpperCase()})` : '';
     const street = addr.road
       ? (addr.house_number ? `${addr.road} ${addr.house_number}` : addr.road)
       : (addr.neighbourhood || addr.suburb);
-    if (street && city) return `${street}, ${city}`;
-    if (street) return street;
-    if (city && country) return `${city}, ${country}`;
-    return city || country || null;
+    if (street && city) return `${street}, ${city}${cc}`;
+    if (street) return `${street}${cc}`;
+    if (city) return `${city}${cc}`;
+    return addr.country || null;
   }
 
   // Record a stop's marker so its popup location line can be refreshed in place

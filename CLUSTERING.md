@@ -188,10 +188,10 @@ its map popup. The label is resolved in two tiers:
 
 ### Label format (`_composeAddress`)
 
-Every stop is shown at **street** level — `Street [number], City` — so stops are
+Every stop is shown at **street** level with the ISO country code in parentheses
+— `Street [number], City (CC)` (e.g. `Main St, Madrid (ES)`) — so stops are
 always identifiable. When the response has no street (`road`/`neighbourhood`/
-`suburb`), it falls back to `City, Country`, and finally to whichever of the two
-is present.
+`suburb`) it falls back to `City (CC)`, and finally to the country name alone.
 
 The cache stores the raw address **components**, not a finished string, so the
 label can be recomposed (e.g. with different fallbacks) without re-querying.
