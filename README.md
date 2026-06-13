@@ -65,7 +65,8 @@ The card supports a **visual editor** — click the pencil icon after adding the
 - **Theme** — map theme: System (follows Home Assistant), Light, or Dark
 - **Timeline** — show a panel below the map listing stops and movements
 - **Map height** — map height in pixels
-- **Cluster radius** — distance in meters within which nearby points are grouped into a single stop cluster
+- **Units** — unit system for distances: Metric (m / km) or Imperial (ft / mi)
+- **Cluster radius** — distance (in the chosen units) within which nearby points are grouped into a single stop cluster
 - **Minimum points per cluster** — how many consecutive points within the radius are needed to form a cluster
 
 Alternatively, configure it manually via YAML:
@@ -81,6 +82,7 @@ default_entity: device_tracker.jane_iphone
 theme: system
 show_timeline: true
 map_height: 450
+units: metric
 cluster_radius: 100
 min_points: 3
 ```
@@ -95,7 +97,8 @@ min_points: 3
 | `theme` | `string` | `system` | Map theme: `system` (follows the Home Assistant light/dark mode), `light`, or `dark`. |
 | `show_timeline` | `boolean` | `false` | Show a timeline panel below the map listing each stop with its time range and the distance travelled between stops. |
 | `map_height` | `number` | `400` | Map height in pixels |
-| `cluster_radius` | `number` | `100` | Radius in meters for grouping nearby points into stop clusters. Points outside any cluster are treated as in-transit and are not marked individually. |
+| `units` | `string` | `metric` | Unit system for distances: `metric` (m / km) or `imperial` (ft / mi). Also sets the unit of `cluster_radius`. |
+| `cluster_radius` | `number` | `100` | Radius for grouping nearby points into stop clusters, in the configured `units` (meters when `metric`, feet when `imperial`). Points outside any cluster are treated as in-transit and are not marked individually. |
 | `min_points` | `number` | `3` | Minimum number of consecutive points within the radius required to form a cluster. Runs shorter than this are treated as in-transit. |
 
 > See [CLUSTERING.md](CLUSTERING.md) for a detailed explanation of how points are grouped into stops, how the line is smoothed, and how stray points are handled.

@@ -55,7 +55,8 @@ shadowRoot (`_injectLeafletCss`).
 | `theme`          | `system`    | `system` / `light` / `dark` (map tiles).          |
 | `show_timeline`  | `false`     | Timeline panel below the map.                     |
 | `map_height`     | `400`       | Pixels.                                           |
-| `cluster_radius` | `100`       | Meters. See CLUSTERING.md.                        |
+| `units`          | `metric`    | `metric` (m/km) or `imperial` (ft/mi). Sets `cluster_radius` unit too. |
+| `cluster_radius` | `100`       | In `units` (m / ft). Always converted to metres internally. See CLUSTERING.md. |
 | `min_points`     | `3`         | Min consecutive points for a stop. See CLUSTERING.md. |
 
 ## Gotchas & decisions (read before changing related code)
