@@ -678,9 +678,12 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       }
       .tl-subline {
         display: flex;
+        align-items: baseline;
         justify-content: space-between;
         gap: 10px;
+        margin-top: 1px;
       }
+      .tl-zone { font-weight: 500; }
       .tl-move .tl-title {
         color: var(--secondary-text-color, #888);
         font-style: italic;
@@ -1106,10 +1109,11 @@ class LovelaceTrackHistoryCard extends HTMLElement {
           : `${fmt(it.time)} – ${fmt(it.timeTo)}`;
         // Mid stops carry the zone (when any) on its own line under the title,
         // above the dwell duration.
-        // Mid stops: zone (left) and dwell duration (right) share one line.
+        // Mid stops: zone (left, styled like the title) and dwell duration
+        // (right, muted) share one line.
         const sub = isStartEnd
           ? ''
-          : `<div class="tl-sub tl-subline"><span>${it.zone ? `(${it.zone})` : ''}</span><span>(${this._fmtDuration(it.timeTo - it.time)})</span></div>`;
+          : `<div class="tl-subline"><span class="tl-zone">${it.zone ? `(${it.zone})` : ''}</span><span class="tl-sub">(${this._fmtDuration(it.timeTo - it.time)})</span></div>`;
         return `
           <div class="tl-item tl-stop">
             <div class="tl-rail"><div class="tl-icon">${icon}</div></div>
