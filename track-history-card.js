@@ -1002,7 +1002,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
           : `${fmt(it.time)} – ${fmt(it.timeTo)}`;
         const sub = it.role === 'start' || it.role === 'end'
           ? ''
-          : `<div class="tl-sub">${this._fmtDuration(it.timeTo - it.time)}</div>`;
+          : `<div class="tl-sub">(${this._fmtDuration(it.timeTo - it.time)})</div>`;
         return `
           <div class="tl-item tl-stop">
             <div class="tl-rail"><div class="tl-icon">${icon}</div></div>
