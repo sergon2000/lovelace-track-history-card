@@ -513,6 +513,13 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         gap: 10px;
         font-size: 13px;
         color: var(--primary-text-color, #333);
+        padding: 6px 10px;
+        border-radius: 8px;
+      }
+      /* Stops get a zebra background so the right-hand value reads as part of
+         the same row; movement segments stay transparent in between. */
+      .tl-item.tl-stop {
+        background: var(--secondary-background-color, rgba(0, 0, 0, 0.05));
       }
       .tl-rail {
         position: relative;
@@ -538,21 +545,21 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         font-size: 10px;
         font-weight: 700;
       }
-      /* Vertical connector between consecutive events. */
+      /* Vertical connector between consecutive events; extends past the row
+         padding so the line stays continuous across the gap. */
       .tl-item:not(:last-child) .tl-rail::after {
         content: '';
         position: absolute;
         left: 50%;
         transform: translateX(-50%);
         top: 20px;
-        bottom: 0;
+        bottom: -12px;
         width: 2px;
         background: var(--divider-color, #e0e0e0);
       }
       .tl-main {
         flex: 1;
         min-width: 0;
-        padding-bottom: 14px;
       }
       .tl-line {
         display: flex;
@@ -997,7 +1004,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
           ? ''
           : `<div class="tl-sub">${this._fmtDuration(it.timeTo - it.time)}</div>`;
         return `
-          <div class="tl-item">
+          <div class="tl-item tl-stop">
             <div class="tl-rail"><div class="tl-icon">${icon}</div></div>
             <div class="tl-main">
               <div class="tl-line">
