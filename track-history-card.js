@@ -676,6 +676,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         font-size: 12px;
         color: var(--secondary-text-color, #888);
       }
+      .tl-zone {
+        text-align: left;
+      }
       .tl-move .tl-title {
         color: var(--secondary-text-color, #888);
         font-style: italic;
@@ -1103,7 +1106,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         // above the dwell duration.
         const sub = isStartEnd
           ? ''
-          : `${it.zone ? `<div class="tl-sub">(${it.zone})</div>` : ''}<div class="tl-sub">(${this._fmtDuration(it.timeTo - it.time)})</div>`;
+          : `${it.zone ? `<div class="tl-sub tl-zone">(${it.zone})</div>` : ''}<div class="tl-sub">(${this._fmtDuration(it.timeTo - it.time)})</div>`;
         return `
           <div class="tl-item tl-stop">
             <div class="tl-rail"><div class="tl-icon">${icon}</div></div>
