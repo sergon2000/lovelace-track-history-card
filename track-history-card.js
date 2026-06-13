@@ -1183,25 +1183,53 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
   _addArrows(L, latlngs) {
     if (latlngs.length < 2) return;
-    const step = Math.max(1, Math.floor(latlngs.length / 30));
-    for (let i = step; i < latlngs.length; i += step) {
+
+    // Per-segment lengths (km) and total path length, so arrows can be spaced
+    // by real distance rather than by vertex index. Index spacing left long
+    // straight stretches (few vertices) sparse and wiggly ones dense; equal
+    // distance spacing keeps the arrow density uniform along the whole route.
+    const segLen = [];
+    let total = 0;
+    for (let i = 1; i < latlngs.length; i++) {
+      const d = this._haversine(
+        { lat: latlngs[i - 1][0], lng: latlngs[i - 1][1] },
+        { lat: latlngs[i][0],     lng: latlngs[i][1] });
+      segLen.push(d);
+      total += d;
+    }
+    if (total === 0) return;
+
+    // Aim for ~30 arrows total so long trips don't render hundreds of markers.
+    const stepDist = total / 30;
+    let nextAt = stepDist;  // distance from the start at which to drop the next arrow
+    let acc    = 0;         // cumulative distance up to the start of the current segment
+
+    for (let i = 1; i < latlngs.length; i++) {
+      const segStart = acc;
+      acc += segLen[i - 1];
       const [lat1, lng1] = latlngs[i - 1];
       const [lat2, lng2] = latlngs[i];
       const angle = this._bearing(lat1, lng1, lat2, lng2);
-      const mid   = [(lat1 + lat2) / 2, (lng1 + lng2) / 2];
-      L.marker(mid, {
-        icon: L.divIcon({
-          html: `<div style="transform:rotate(${angle}deg);font-size:22px;line-height:1;
-                   color:#1565C0;text-shadow:0 0 4px #fff,0 0 4px #fff;">▲</div>`,
-          className: '',
-          iconSize: [22, 22],
-          iconAnchor: [11, 11],
-        }),
-        interactive: false,
-        // Keep arrows below stop/start/end markers (Leaflet otherwise stacks
-        // markers by latitude, so an arrow could cover a cluster marker).
-        zIndexOffset: -1000,
-      }).addTo(this._map);
+      // Drop every arrow whose target distance lands inside this segment,
+      // interpolating its exact position along the segment.
+      while (nextAt <= acc && nextAt < total) {
+        const t   = segLen[i - 1] > 0 ? (nextAt - segStart) / segLen[i - 1] : 0;
+        const pos = [lat1 + (lat2 - lat1) * t, lng1 + (lng2 - lng1) * t];
+        nextAt += stepDist;
+        L.marker(pos, {
+          icon: L.divIcon({
+            html: `<div style="transform:rotate(${angle}deg);font-size:22px;line-height:1;
+                     color:#1565C0;text-shadow:0 0 4px #fff,0 0 4px #fff;">▲</div>`,
+            className: '',
+            iconSize: [22, 22],
+            iconAnchor: [11, 11],
+          }),
+          interactive: false,
+          // Keep arrows below stop/start/end markers (Leaflet otherwise stacks
+          // markers by latitude, so an arrow could cover a cluster marker).
+          zIndexOffset: -1000,
+        }).addTo(this._map);
+      }
     }
   }
 
