@@ -1432,7 +1432,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
       </style>
       <div class="editor">
         <div>
-          <div class="section-label">${this._t('tracked_devs')}</div>
+          <div class="section-label" style="margin-bottom:12px">${this._t('tracked_devs')}</div>
           <div id="entities-list"></div>
           <button class="add-btn" id="add-entity">${this._t('add_device')}</button>
         </div>
