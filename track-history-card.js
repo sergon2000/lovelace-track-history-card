@@ -1059,11 +1059,11 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
   }
 
-  // Dwell time for a stop, given a span in epoch seconds → "1 h 15 min".
-  // "min" (not "m") avoids clashing with metres in distances; both units read
-  // the same across the supported locales.
-  _fmtDuration(seconds) {
-    const mins = Math.max(0, Math.round(seconds / 60));
+  // Dwell time for a stop, given a span in milliseconds (Date subtraction)
+  // → "1 h 15 min". "min" (not "m") avoids clashing with metres in distances;
+  // both units read the same across the supported locales.
+  _fmtDuration(ms) {
+    const mins = Math.max(0, Math.round(ms / 60000));
     const h = Math.floor(mins / 60);
     const m = mins % 60;
     if (h && m) return `${h} h ${m} min`;
