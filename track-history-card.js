@@ -1463,16 +1463,15 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
             style="display:${hasTitle ? 'block' : 'none'}">
         </div>
 
-        <div>
+        <div class="check-row">
           <label class="check-label">
             <input type="checkbox" id="arrows-check" ${showArrows ? 'checked' : ''}>
             <span>${this._t('arrows_lbl')}</span>
           </label>
-          <div id="arrow-count-wrap" style="display:${showArrows ? 'block' : 'none'}; margin-top:8px;">
-            <div class="section-label">${this._t('arrow_count_lbl')}</div>
-            <input type="number" id="f-arrow-count" class="text-input" style="margin-top:0"
-              value="${arrowCount}" min="1" max="200">
-          </div>
+          <input type="number" id="f-arrow-count" class="text-input"
+            value="${arrowCount}" min="1" max="200" title="${this._t('arrow_count_lbl')}"
+            placeholder="${this._t('arrow_count_lbl')}"
+            style="display:${showArrows ? 'block' : 'none'}">
         </div>
 
         <div>
@@ -1558,8 +1557,8 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     this.shadowRoot.getElementById('arrows-check')
       .addEventListener('change', e => {
         // Arrows on is the default, so store only the "off" state.
-        const wrap = this.shadowRoot.getElementById('arrow-count-wrap');
-        if (wrap) wrap.style.display = e.target.checked ? 'block' : 'none';
+        const count = this.shadowRoot.getElementById('f-arrow-count');
+        if (count) count.style.display = e.target.checked ? 'block' : 'none';
         this._set('show_arrows', e.target.checked ? null : false);
       });
 
