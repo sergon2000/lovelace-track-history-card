@@ -147,7 +147,10 @@ When `show_timeline` is enabled, the panel lists the day in order, derived from
 the same `displayed` array:
 
 - **Stops** — “Start”, “Stop N”, … , “End”, each with its time (departure for
-  start, arrival for end, full range for mid stops).
+  start, arrival for end, full range for mid stops). If the stop falls inside a
+  Home Assistant zone (a `zone.*` entity, smallest one wins when they overlap),
+  its name is shown too — in parentheses after “Start”/“End”, or on its own line
+  under “Stop N” for mid stops (`_zoneName`).
 - **Moving** — between consecutive stops (and before/after the first/last stop
   when there are in-transit points), showing the distance travelled along that
   segment. Distances under 1 km are shown in metres, otherwise in kilometres.
