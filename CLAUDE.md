@@ -57,7 +57,7 @@ shadowRoot (`_injectLeafletCss`).
 | `show_arrows`    | `true`      | Direction arrows along the path.                  |
 | `arrow_count`    | `30`        | Number of arrows (spread by distance). See `_addArrows`. |
 | `map_height`     | `400`       | Pixels.                                           |
-| `cluster_radius` | `100`       | Meters. See CLUSTERING.md.                        |
+| `cluster_radius` | `200`       | Meters (range 50–500). See CLUSTERING.md.         |
 | `min_points`     | `3`         | Min consecutive points for a stop. See CLUSTERING.md. |
 
 ## Gotchas & decisions (read before changing related code)

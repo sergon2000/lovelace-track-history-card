@@ -31,7 +31,7 @@ The result of `_clusterPoints` is referred to as `displayed` throughout.
 
 | Option           | Default | Meaning                                                                 |
 |------------------|---------|-------------------------------------------------------------------------|
-| `cluster_radius` | `100` m | Points within this distance of a cluster's running centroid join it.    |
+| `cluster_radius` | `200` m | Points within this distance of a cluster's running centroid join it.    |
 | `min_points`     | `3`     | A group needs at least this many points to count as a cluster (a stop). |
 
 ## Clustering algorithm (`_clusterPoints`)

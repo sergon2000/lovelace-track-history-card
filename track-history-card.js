@@ -264,7 +264,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { entities: [], map_height: 400, cluster_radius: 100, min_points: 3, theme: 'system' };
+    return { entities: [], map_height: 400, cluster_radius: 200, min_points: 3, theme: 'system' };
   }
 
   setConfig(config) {
@@ -274,7 +274,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     this._config = {
       map_height: 400,
       default_entity: null,
-      cluster_radius: 100,
+      cluster_radius: 200,
       min_points: 3,
       theme: 'system',
       ...config,
@@ -283,7 +283,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     // can't bypass them. Out-of-range / non-numeric values are clamped (or
     // fall back to the default), matching what the visual editor would store.
     this._config.map_height     = this._clampNum(this._config.map_height,     200, 1000, 400);
-    this._config.cluster_radius = this._clampNum(this._config.cluster_radius,  100,  500, 100);
+    this._config.cluster_radius = this._clampNum(this._config.cluster_radius,   50,  500, 200);
     this._config.min_points     = this._clampNum(this._config.min_points,        2,    5,   3);
     if (this._config.arrow_count != null) {
       this._config.arrow_count  = this._clampNum(this._config.arrow_count,      10,   30,  30);
@@ -817,7 +817,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const startP = displayed[0];
     const endP   = displayed[displayed.length - 1];
     const sameZone = displayed.length > 1
-      && this._haversine(startP, endP) * 1000 <= (this._config.cluster_radius || 100);
+      && this._haversine(startP, endP) * 1000 <= (this._config.cluster_radius || 200);
 
     if (sameZone) {
       this._startEndMarker(L, startP, endP).addTo(this._map);
@@ -1323,7 +1323,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     const titleValue    = this._config.title || '';
     const hasDefault    = !!this._config.default_entity;
     const defaultValue  = this._config.default_entity || '';
-    const clusterRadius = this._config.cluster_radius ?? 100;
+    const clusterRadius = this._config.cluster_radius ?? 200;
     const minPoints     = this._config.min_points ?? 3;
     const themeValue    = this._config.theme || 'system';
     const showTimeline  = !!this._config.show_timeline;
@@ -1519,7 +1519,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           <div>
             <div class="section-label">${this._t('cluster_radius_lbl')}</div>
             <input type="number" id="f-cluster-radius" class="text-input" style="margin-top:0"
-              value="${clusterRadius}" min="100" max="500">
+              value="${clusterRadius}" min="50" max="500">
           </div>
 
           <div>
@@ -1587,7 +1587,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
 
     this.shadowRoot.getElementById('f-cluster-radius')
       .addEventListener('change', e => {
-        this._set('cluster_radius', this._clampInt(e.target, 100, 500, 100));
+        this._set('cluster_radius', this._clampInt(e.target, 50, 500, 200));
       });
 
     this.shadowRoot.getElementById('f-min-points')
