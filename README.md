@@ -21,7 +21,7 @@ A custom Lovelace card for [Home Assistant](https://www.home-assistant.io/) that
 - **Start** (green) and **End** (red) pin markers with popup details
 - Nearby points are grouped into **stop clusters** (configurable radius) showing visit count and per-visit time ranges; in-transit points are not marked, so only the path line represents them
 - Summary bar with total points, time range, and approximate distance
-- Optional **Timeline** panel below the map listing each stop (with its time range) and the distance travelled while moving between stops
+- Optional **Timeline** panel below the map listing each stop (with its time range, and the name of the Home Assistant zone it falls in, if any) and the distance travelled while moving between stops
 - Adapts to the Home Assistant theme (light / dark)
 
 ---

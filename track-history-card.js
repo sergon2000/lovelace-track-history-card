@@ -676,6 +676,14 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         font-size: 12px;
         color: var(--secondary-text-color, #888);
       }
+      .tl-subline {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+        margin-top: 1px;
+      }
+      .tl-zone { font-weight: 500; }
       .tl-move .tl-title {
         color: var(--secondary-text-color, #888);
         font-style: italic;
@@ -925,8 +933,11 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       iconAnchor: [13, 13],
       popupAnchor: [0, -16],
     });
+    // Start and end coincide here, so they share a zone — show it once, first.
+    const zone = this._zoneName(startP);
     const popup = `
       <div style="min-width:120px">
+        ${zone ? `<strong>(${zone})</strong><br>` : ''}
         <strong>${this._t('start')}</strong> 🕐 ${fmt(startP.timeTo ?? startP.time)}<br>
         <strong>${this._t('end')}</strong> 🕐 ${fmt(endP.time)}
       </div>`;
@@ -937,6 +948,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
   _popupHtml(point, label = '', role = '') {
     const fmt = t => this._fmtTime(t);
+    // Zone (if any) is appended in parentheses right after the label.
+    const zone = this._zoneName(point);
+    const labelText = label && zone ? `${label} (${zone})` : label;
     // Start stop → departure time (last point); end stop → arrival time
     // (first point); other stops → the full arrival–departure range.
     const timeHtml = role === 'start'
@@ -948,7 +962,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       : `🕐 ${fmt(point.time)}`;
     return `
       <div style="min-width:120px">
-        ${label ? `<strong>${label}</strong><br>` : ''}
+        ${labelText ? `<strong>${labelText}</strong><br>` : ''}
         ${timeHtml}
       </div>`;
   }
@@ -1085,9 +1099,12 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const fmt = t => this._fmtTime(t);
     const rows = items.map(it => {
       if (it.type === 'stop') {
-        const title = it.role === 'start' ? this._t('start')
+        const isStartEnd = it.role === 'start' || it.role === 'end';
+        let title = it.role === 'start' ? this._t('start')
           : it.role === 'end' ? this._t('end')
           : `${this._t('stop_n')} ${it.n}`;
+        // Start/end show the zone inline, right after the word Start / End.
+        if (isStartEnd && it.zone) title += ` (${it.zone})`;
         const icon = it.role === 'start' ? '🟢'
           : it.role === 'end' ? '🔴'
           : `<span class="tl-badge">${it.n}</span>`;
@@ -1096,9 +1113,13 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         const value = it.role === 'start' ? fmt(it.timeTo)
           : it.role === 'end' ? fmt(it.time)
           : `${fmt(it.time)} – ${fmt(it.timeTo)}`;
-        const sub = it.role === 'start' || it.role === 'end'
+        // Mid stops carry the zone (when any) on its own line under the title,
+        // above the dwell duration.
+        // Mid stops: zone (left, styled like the title) and dwell duration
+        // (right, muted) share one line.
+        const sub = isStartEnd
           ? ''
-          : `<div class="tl-sub">(${this._fmtDuration(it.timeTo - it.time)})</div>`;
+          : `<div class="tl-subline"><span class="tl-zone">${it.zone ? `(${it.zone})` : ''}</span><span class="tl-sub">(${this._fmtDuration(it.timeTo - it.time)})</span></div>`;
         return `
           <div class="tl-item tl-stop">
             <div class="tl-rail"><div class="tl-icon">${icon}</div></div>
@@ -1147,7 +1168,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
     stops.forEach((idx, s) => {
       const p = displayed[idx];
-      items.push({ type: 'stop', n: p.stopNo, role: p.stopRole, time: p.time, timeTo: p.timeTo });
+      items.push({ type: 'stop', n: p.stopNo, role: p.stopRole, time: p.time, timeTo: p.timeTo, zone: this._zoneName(p) });
       if (s < stops.length - 1) items.push({ type: 'move', dist: segDist(idx, stops[s + 1]) });
     });
 
@@ -1165,6 +1186,25 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       return miles < 0.1 ? `${Math.round(km * 3280.84)} ft` : `${miles.toFixed(1)} mi`;
     }
     return km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+  }
+
+  // Name of the Home Assistant zone (a zone.* entity) that contains a point, or
+  // null if it falls outside every zone. When zones overlap, the smallest (most
+  // specific) one wins — mirroring how HA assigns a device to a zone.
+  _zoneName(point) {
+    const states = this._hass?.states;
+    if (!states) return null;
+    let best = null;
+    for (const id in states) {
+      if (!id.startsWith('zone.')) continue;
+      const a = states[id].attributes || {};
+      if (a.latitude == null || a.longitude == null || !a.radius) continue;
+      const dist = this._haversine(point, { lat: a.latitude, lng: a.longitude }) * 1000;
+      if (dist <= a.radius && (!best || a.radius < best.radius)) {
+        best = { name: a.friendly_name || id.slice(5), radius: a.radius };
+      }
+    }
+    return best ? best.name : null;
   }
 
   // The cluster radius is entered in the configured units (m or ft) but the
