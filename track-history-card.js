@@ -726,8 +726,11 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         btn.href = '#';
         btn.title = self._t('recenter');
         btn.setAttribute('role', 'button');
+        btn.style.display = 'flex';
+        btn.style.alignItems = 'center';
+        btn.style.justifyContent = 'center';
         btn.innerHTML = `
-          <svg viewBox="0 0 24 24" width="18" height="18" style="display:block;margin:4px auto">
+          <svg viewBox="0 0 24 24" width="18" height="18" style="display:block">
             <path fill="currentColor" d="M12 8a4 4 0 100 8 4 4 0 000-8zm8.94 3A9 9 0 0013 3.06V1h-2v2.06A9 9 0 003.06 11H1v2h2.06A9 9 0 0011 20.94V23h2v-2.06A9 9 0 0020.94 13H23v-2zM12 19a7 7 0 110-14 7 7 0 010 14z"/>
           </svg>`;
         L.DomEvent.on(btn, 'click', (e) => {
