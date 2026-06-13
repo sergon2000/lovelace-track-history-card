@@ -544,6 +544,10 @@ class LovelaceTrackHistoryCard extends HTMLElement {
          in the user's HA format. The calendar picker indicator stays visible
          and clickable (the overlay is pointer-events:none). */
       .date-field input[type="date"] { color: transparent; }
+      /* While editing, reveal the native input and hide our overlay so the two
+         don't overlap; the overlay returns (in the HA format) on blur. */
+      .date-field:focus-within input[type="date"] { color: var(--primary-text-color, #333); }
+      .date-field:focus-within .date-display { display: none; }
       .date-display {
         position: absolute;
         inset: 0;
