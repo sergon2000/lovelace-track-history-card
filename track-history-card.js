@@ -550,6 +550,10 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         display: flex;
         align-items: center;
         justify-content: center;
+        /* Leave room for the calendar picker indicator on the right so the
+           text stays centred over the visible field, not the whole box. */
+        padding-right: 20px;
+        box-sizing: border-box;
         pointer-events: none;
         font-size: 14px;
         color: var(--primary-text-color, #333);
