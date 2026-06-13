@@ -703,19 +703,21 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     if (!entityId || !date) return;
 
     this._setAlert('');
-    this._setSummary(null);
-    this._setTimeline(null);
-    this._setNoData(false);
 
     try {
       await this._injectLeafletCss();
       const L = await ensureLeaflet();
       const points = await this._fetchPoints(entityId, date);
 
+      // The previous summary/timeline stay on screen during the fetch and are
+      // replaced in place once the new data is ready — clearing them up front
+      // collapses the card and then re-expands it, which reads as a flicker.
       if (points.length === 0) {
         // Keep the map alive (the opaque "no data" overlay covers it); just
         // drop the previous track so returning to a day with data is flicker-free.
         if (this._trackLayer) this._trackLayer.clearLayers();
+        this._setSummary(null);
+        this._setTimeline(null);
         this._setNoData(true);
       } else {
         this._setNoData(false);
@@ -808,15 +810,20 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const theme = this._resolveTheme();
     if (this._tileLayer && this._tileTheme === theme) return;
     if (this._tileLayer) this._map.removeLayer(this._tileLayer);
+    // keepBuffer holds more off-screen tiles so panning/zooming to a new day or
+    // device reuses cached tiles instead of flashing the empty background while
+    // fresh ones load (fade animations are off, so there's no cross-fade).
     this._tileLayer = theme === 'dark'
       ? L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
           attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>',
           subdomains: 'abcd',
           maxZoom: 19,
+          keepBuffer: 6,
         })
       : L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
           maxZoom: 19,
+          keepBuffer: 6,
         });
     this._tileLayer.addTo(this._map);
     this._tileTheme = theme;
