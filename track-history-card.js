@@ -395,6 +395,25 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     return t.toLocaleTimeString(locale?.language || [], opts);
   }
 
+  // Format an ISO date (yyyy-mm-dd) honouring the user's HA profile date_format
+  // (DMY / MDY / YMD / language / system). The native <input type="date"> can't
+  // be told which order to render, so we display this string over it instead.
+  _fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso + 'T12:00:00');
+    if (isNaN(d)) return iso;
+    const locale = this._hass?.locale;
+    const fmt = locale?.date_format;
+    const opts = { year: 'numeric', month: '2-digit', day: '2-digit' };
+    // Force the day/month/year order via a locale known to produce it.
+    if (fmt === 'DMY') return d.toLocaleDateString('en-GB', opts); // dd/mm/yyyy
+    if (fmt === 'MDY') return d.toLocaleDateString('en-US', opts); // mm/dd/yyyy
+    if (fmt === 'YMD') return d.toLocaleDateString('en-CA', opts); // yyyy-mm-dd
+    if (fmt === 'system') return d.toLocaleDateString([], opts);   // browser locale
+    // 'language' or unset → the HA UI language's own date format.
+    return d.toLocaleDateString(locale?.language || [], opts);
+  }
+
   disconnectedCallback() {
     this._destroyMap();
   }
@@ -429,7 +448,10 @@ class LovelaceTrackHistoryCard extends HTMLElement {
               <label>${this._t('date')}</label>
               <div class="date-nav">
                 <button type="button" class="date-nav-btn" id="date-prev">&#8249;</button>
-                <input type="date" id="date-picker" value="${selDate}" max="${today}" />
+                <div class="date-field">
+                  <input type="date" id="date-picker" value="${selDate}" max="${today}" />
+                  <span class="date-display" id="date-display">${this._fmtDate(selDate)}</span>
+                </div>
                 <button type="button" class="date-nav-btn" id="date-next" ${selDate >= today ? 'disabled' : ''}>&#8250;</button>
               </div>
             </div>
@@ -451,11 +473,13 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         this._onLoad();
       });
 
-    const datePicker = this.shadowRoot.getElementById('date-picker');
-    const dateNext   = this.shadowRoot.getElementById('date-next');
-    const applyDate  = () => {
+    const datePicker  = this.shadowRoot.getElementById('date-picker');
+    const dateNext    = this.shadowRoot.getElementById('date-next');
+    const dateDisplay = this.shadowRoot.getElementById('date-display');
+    const applyDate   = () => {
       this._selectedDate = datePicker.value;
       dateNext.disabled = datePicker.value >= today;
+      if (dateDisplay) dateDisplay.textContent = this._fmtDate(datePicker.value);
       this._onLoad();
     };
     datePicker.addEventListener('change', applyDate);
@@ -515,7 +539,21 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         align-items: center;
         gap: 4px;
       }
-      .date-nav input[type="date"] { flex: 1; }
+      .date-field { position: relative; flex: 1; }
+      /* Hide the input's own (browser-locale) text; the overlay shows the date
+         in the user's HA format. The calendar picker indicator stays visible
+         and clickable (the overlay is pointer-events:none). */
+      .date-field input[type="date"] { color: transparent; }
+      .date-display {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        pointer-events: none;
+        font-size: 14px;
+        color: var(--primary-text-color, #333);
+      }
       .date-nav-btn {
         flex-shrink: 0;
         width: 30px;
@@ -701,6 +739,11 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const entityId = this.shadowRoot.getElementById('entity-select').value;
     const date     = this.shadowRoot.getElementById('date-picker').value;
     if (!entityId || !date) return;
+
+    // Keep the date overlay in sync with the locale (the first build can run
+    // before `hass` — and thus the user's date_format — is available).
+    const dateDisplay = this.shadowRoot.getElementById('date-display');
+    if (dateDisplay) dateDisplay.textContent = this._fmtDate(date);
 
     this._setAlert('');
     this._setSummary(null);
