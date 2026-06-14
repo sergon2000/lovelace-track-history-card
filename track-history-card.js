@@ -299,6 +299,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     this._hass = null;
     this._leafletCssInjected = false;
     this._autoLoaded = false;
+    this._hasConnected = false;
     // Reverse-geocoding state. `_loadGen` is bumped on every load so responses
     // that arrive after the user changed day/device are discarded. `_geoMarkers`
     // maps a stop's rounded-coordinate key → the marker popup rebuilders, and
@@ -440,6 +441,20 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
   disconnectedCallback() {
     this._destroyMap();
+  }
+
+  connectedCallback() {
+    // The first attach is handled by the normal setConfig / `set hass` load
+    // path. A *re-attach* (switching away and back to the view, or opening the
+    // visual editor) lands here after disconnectedCallback destroyed the map —
+    // Home Assistant reuses the element, so the DOM and the selected date/device
+    // survive on the instance. Redraw from them so the map comes back without a
+    // full page reload or a manual date/device change.
+    if (this._hasConnected) {
+      if (this._config && this._hass) this._onLoad();
+    } else {
+      this._hasConnected = true;
+    }
   }
 
   // ── Rendering ─────────────────────────────────────────────────────────────
