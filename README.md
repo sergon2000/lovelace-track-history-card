@@ -22,6 +22,7 @@ A custom Lovelace card for [Home Assistant](https://www.home-assistant.io/) that
 - Nearby points are grouped into **stop clusters** (configurable radius) showing visit count and per-visit time ranges; in-transit points are not marked, so only the path line represents them
 - Summary bar with total points, time range, and approximate distance
 - Optional **Timeline** panel below the map listing each stop (with its time range, and the name of the Home Assistant zone it falls in, if any) and the distance travelled while moving between stops
+- Optional **reverse geocoding** (opt-in) labels stops outside any zone with their address (street, city and ISO country code, e.g. `Main St, Madrid · ES`)
 - Adapts to the Home Assistant theme (light / dark)
 
 ---
@@ -69,6 +70,7 @@ The card supports a **visual editor** — click the pencil icon after adding the
 - **Units** — unit system for distances: Metric (m / km) or Imperial (ft / mi)
 - **Cluster radius** — distance (in the chosen units) within which nearby points are grouped into a single stop cluster
 - **Minimum points per cluster** — how many consecutive points within the radius are needed to form a cluster
+- **Reverse geocoding** — look up an address for stops that fall outside every Home Assistant zone (off by default; see the note below)
 
 Alternatively, configure it manually via YAML:
 
@@ -88,6 +90,7 @@ map_height: 450
 units: metric
 cluster_radius: 200
 min_points: 3
+reverse_geocode: false
 ```
 
 ### Options
@@ -105,8 +108,32 @@ min_points: 3
 | `units` | `string` | `metric` | Unit system for distances: `metric` (m / km) or `imperial` (ft / mi). Also sets the unit of `cluster_radius`. |
 | `cluster_radius` | `number` | `200` | Radius for grouping nearby points into stop clusters, in the configured `units` (meters when `metric`, feet when `imperial`); range `50`–`500`. Points outside any cluster are treated as in-transit and are not marked individually. |
 | `min_points` | `number` | `3` | Minimum number of consecutive points within the radius required to form a cluster (`2`–`5`). Runs shorter than this are treated as in-transit. |
+| `reverse_geocode` | `boolean` | `false` | Look up an address (street, city and ISO country code, e.g. `Main St, Madrid · ES`) for stops that fall outside every Home Assistant zone. **Off by default** — see [Reverse geocoding](#reverse-geocoding). |
+| `geocode_url` | `string` | Nominatim | Reverse-geocoding endpoint. Defaults to the public [Nominatim](https://nominatim.org/) service; may point at any Nominatim-compatible reverse endpoint (e.g. [LocationIQ](https://locationiq.com/) or a self-hosted instance). Only used when `reverse_geocode` is `true`. |
 
 > See [CLUSTERING.md](CLUSTERING.md) for a detailed explanation of how points are grouped into stops, how the line is smoothed, and how stray points are handled.
+
+### Reverse geocoding
+
+When `reverse_geocode` is enabled, stops that don't fall inside any Home Assistant
+zone are labelled with an address looked up from an online service. Home Assistant
+zones always take precedence — geocoding only fills the gaps.
+
+The labels appear progressively as each lookup resolves; the map and timeline
+render immediately and don't wait for them. Results are cached in your browser
+(`localStorage`) for 90 days, so recurring places and revisited days don't trigger
+new lookups.
+
+A few things to be aware of before enabling it:
+
+- **Privacy** — your stop coordinates are sent to the configured geocoding service
+  (the public Nominatim server by default). This is why it is **opt-in**.
+- **Rate limits** — the default [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/)
+  caps requests at roughly one per second, so the card looks stops up one at a
+  time. Only stops are geocoded (never the in-transit points), keeping the volume
+  low. For heavier use, point `geocode_url` at a service without that limit.
+- **Per browser/device** — the cache lives in each browser, so the first visit
+  from a new device looks the stops up again.
 
 ---
 
