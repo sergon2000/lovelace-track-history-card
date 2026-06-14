@@ -728,7 +728,15 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         justify-content: space-between;
         gap: 10px;
       }
-      .tl-title { font-weight: 500; }
+      /* min-width:0 + ellipsis lets a long location truncate instead of
+         pushing the right-hand time/duration onto a second line (mobile). */
+      .tl-title {
+        font-weight: 500;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .tl-value {
         flex-shrink: 0;
         color: var(--secondary-text-color, #888);
@@ -736,9 +744,11 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         white-space: nowrap;
       }
       .tl-sub {
+        flex-shrink: 0;
         margin-top: 1px;
         text-align: right;
         font-size: 12px;
+        white-space: nowrap;
         color: var(--secondary-text-color, #888);
       }
       .tl-subline {
@@ -748,7 +758,13 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         gap: 10px;
         margin-top: 1px;
       }
-      .tl-zone { font-weight: 500; }
+      .tl-zone {
+        font-weight: 500;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .tl-move .tl-title {
         color: var(--secondary-text-color, #888);
         font-style: italic;
