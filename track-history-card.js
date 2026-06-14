@@ -1407,13 +1407,12 @@ class LovelaceTrackHistoryCard extends HTMLElement {
   // (no parentheses, since the whole label is already shown wrapped in them).
   _composeAddress(addr) {
     const city = addr.city;
-    const cc = addr.country_code ? ` · ${addr.country_code.toUpperCase()}` : '';
     const street = addr.road
       ? (addr.house_number ? `${addr.road} ${addr.house_number}` : addr.road)
       : (addr.neighbourhood || addr.suburb);
-    if (street && city) return `${street}, ${city}${cc}`;
-    if (street) return `${street}${cc}`;
-    if (city) return `${city}${cc}`;
+    if (street && city) return `${street}, ${city}`;
+    if (street) return street;
+    if (city) return city;
     return addr.country || null;
   }
 
