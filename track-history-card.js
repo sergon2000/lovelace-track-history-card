@@ -1403,10 +1403,11 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
   // Compose a label from address components: street level (street + city) for
   // every stop, falling back to just the city when there's no street info, with
-  // the ISO country code appended in parentheses — e.g. "Main St, Madrid (ES)".
+  // the ISO country code appended after an em dash — e.g. "Main St, Madrid — ES"
+  // (no parentheses, since the whole label is already shown wrapped in them).
   _composeAddress(addr) {
     const city = addr.city;
-    const cc = addr.country_code ? ` (${addr.country_code.toUpperCase()})` : '';
+    const cc = addr.country_code ? ` — ${addr.country_code.toUpperCase()}` : '';
     const street = addr.road
       ? (addr.house_number ? `${addr.road} ${addr.house_number}` : addr.road)
       : (addr.neighbourhood || addr.suburb);

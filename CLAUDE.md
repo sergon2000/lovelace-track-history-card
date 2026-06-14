@@ -131,8 +131,9 @@ shadowRoot (`_injectLeafletCss`).
   the previous language's labels. Stores raw address **components**, not the
   final string — detail is context-dependent (see next point). Per browser/device.
 - **Label format** (`_composeAddress`): always street level with the ISO country
-  code, `Street [number], City (CC)` (e.g. `Main St, Madrid (ES)`); falls back to
-  `City (CC)` when there's no street info, then the country name alone.
+  code after an em dash, `Street [number], City — CC` (e.g. `Main St, Madrid —
+  ES`); falls back to `City — CC` when there's no street info, then the country
+  name alone. No parentheses — the label is already shown wrapped in them.
 - The timeline location span and the marker popup are updated **in place**
   (addressed by the stop's rounded-coord key via `data-geo` / `_geoMarkers`) — no
   re-render, to avoid reintroducing flicker.

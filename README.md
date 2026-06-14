@@ -22,7 +22,7 @@ A custom Lovelace card for [Home Assistant](https://www.home-assistant.io/) that
 - Nearby points are grouped into **stop clusters** (configurable radius) showing visit count and per-visit time ranges; in-transit points are not marked, so only the path line represents them
 - Summary bar with total points, time range, and approximate distance
 - Optional **Timeline** panel below the map listing each stop (with its time range, and the name of the Home Assistant zone it falls in, if any) and the distance travelled while moving between stops
-- Optional **reverse geocoding** (opt-in) labels stops outside any zone with their address (street, city and ISO country code, e.g. `Main St, Madrid (ES)`)
+- Optional **reverse geocoding** (opt-in) labels stops outside any zone with their address (street, city and ISO country code, e.g. `Main St, Madrid — ES`)
 - Adapts to the Home Assistant theme (light / dark)
 
 ---
@@ -108,7 +108,7 @@ reverse_geocode: false
 | `units` | `string` | `metric` | Unit system for distances: `metric` (m / km) or `imperial` (ft / mi). Also sets the unit of `cluster_radius`. |
 | `cluster_radius` | `number` | `200` | Radius for grouping nearby points into stop clusters, in the configured `units` (meters when `metric`, feet when `imperial`); range `50`–`500`. Points outside any cluster are treated as in-transit and are not marked individually. |
 | `min_points` | `number` | `3` | Minimum number of consecutive points within the radius required to form a cluster (`2`–`5`). Runs shorter than this are treated as in-transit. |
-| `reverse_geocode` | `boolean` | `false` | Look up an address (street, city and ISO country code, e.g. `Main St, Madrid (ES)`) for stops that fall outside every Home Assistant zone. **Off by default** — see [Reverse geocoding](#reverse-geocoding). |
+| `reverse_geocode` | `boolean` | `false` | Look up an address (street, city and ISO country code, e.g. `Main St, Madrid — ES`) for stops that fall outside every Home Assistant zone. **Off by default** — see [Reverse geocoding](#reverse-geocoding). |
 | `geocode_url` | `string` | Nominatim | Reverse-geocoding endpoint. Defaults to the public [Nominatim](https://nominatim.org/) service; may point at any Nominatim-compatible reverse endpoint (e.g. [LocationIQ](https://locationiq.com/) or a self-hosted instance). Only used when `reverse_geocode` is `true`. |
 
 > See [CLUSTERING.md](CLUSTERING.md) for a detailed explanation of how points are grouped into stops, how the line is smoothed, and how stray points are handled.
