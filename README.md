@@ -40,9 +40,9 @@ A custom Lovelace card for [Home Assistant](https://www.home-assistant.io/) that
 
 ### Via HACS (recommended)
 
-1. Open **HACS** → **Frontend**
+1. Open **HACS**
 2. Click the three-dot menu → **Custom repositories**
-3. Add `https://github.com/sergon2000/lovelace-track-history-card` as type **Lovelace**
+3. Add `https://github.com/sergon2000/lovelace-track-history-card` with type **Dashboard** (shown as **Lovelace** in older HACS versions)
 4. Search for **Track History Card** and install it
 5. Reload your browser
 
