@@ -118,6 +118,30 @@ timeline, so the two always match. The start/end clusters are shown by colour
   meets the marker exactly (otherwise it stops short, visible when zoomed in).
 - **In-transit points** — not marked.
 
+### Overlap merging by zoom (`_renderStops`)
+
+Stop markers are drawn into their own layer (`_stopLayer`, separate from the
+polyline/arrows) and **re-grouped on every zoom change** (`zoomend`). Two markers
+whose centres are within `MARKER_OVERLAP_PX` (28 px) of each other at the current
+zoom would visually overlap, so they're merged into a single combined marker
+(single-linkage grouping, so a chain of close markers collapses together). Zooming
+in spreads them out and they split apart again.
+
+A combined marker:
+
+- is placed at the **centroid** of the stops it represents;
+- is **coloured** by the roles involved — green if the start is in the group, red
+  if the end is, half-green/half-red if both, orange otherwise;
+- is **labelled** with the range of mid stop numbers it covers (`2-4`; a single
+  number when only one mid stop, blank when it's only start/end);
+- has a **popup** listing each stop it represents (title + location + time), in
+  time order.
+
+The pre-existing combined start/end marker (start and end within `cluster_radius`,
+`sameZone`) is just the special case where the group is exactly {start, end} with
+no mid stops: it keeps the midpoint position and shared popup so it still meets the
+snapped polyline ends, and that pair is forced to stay merged at every zoom.
+
 ### Start/end times
 
 For the start and end stops the relevant moment is the transition, not the whole

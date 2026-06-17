@@ -29,6 +29,11 @@ const GEO_MIN_GAP_MS = 1100;
 const GEO_TTL_MS = 90 * 24 * 60 * 60 * 1000; // 90 days
 const GEO_CACHE_PREFIX = 'thc:geo:';
 
+// Two stop markers whose centres are closer than this many screen pixels at the
+// current zoom are merged into one combined marker (otherwise their icons would
+// visually overlap); they split apart again as you zoom in. See _renderStops.
+const MARKER_OVERLAP_PX = 28;
+
 // Numeric config limits — the single source of truth for each field's default
 // and the range enforced in setConfig, the editor inputs and the editor labels.
 // Change a value here and it propagates everywhere.
@@ -823,6 +828,8 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         // Keep the map alive (the opaque "no data" overlay covers it); just
         // drop the previous track so returning to a day with data is flicker-free.
         if (this._trackLayer) this._trackLayer.clearLayers();
+        if (this._stopLayer) this._stopLayer.clearLayers();
+        this._stopNodes = null;
         this._setSummary(null);
         this._setTimeline(null);
         this._setNoData(true);
@@ -957,12 +964,12 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       });
       this._trackLayer = L.layerGroup().addTo(this._map);
       this._addRecenterControl(L);
+      // Re-group overlapping stop markers whenever the zoom changes.
+      this._map.on('zoomend', () => this._renderStops(this._L));
     }
+    this._L = L;
     this._ensureTileLayer(L);
     this._trackLayer.clearLayers();
-    // Stop markers are re-created each draw, so drop the previous load's popup
-    // rebuilders before registering the new ones.
-    this._geoMarkers = new Map();
 
     const displayed = this._clusterPoints(points, this._radiusMeters(), this._config.min_points);
     this._numberStops(displayed);
@@ -997,33 +1004,20 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     // Arrows follow the same smoothed geometry so they sit on the drawn line.
     if (this._config.show_arrows !== false) this._addArrows(L, smoothed);
 
-    // Intermediate stop markers, numbered. The first/last stops get the
-    // green/end pins below; in-transit points are represented by the line only.
-    displayed.forEach(p => {
-      if (p.stopRole === 'mid') {
-        const m = this._clusterMarker(L, p);
-        m.addTo(this._trackLayer);
-        this._registerGeoMarker(p, m, loc => this._popupHtml(p, `${this._t('stop_n')} ${p.stopNo}`, '', loc));
-      }
-    });
-
-    if (sameZone) {
-      const m = this._startEndMarker(L, startP, endP);
-      m.addTo(this._trackLayer);
-      this._registerGeoMarker(startP, m, loc => this._startEndPopup(startP, endP, loc));
-    } else {
-      const ms = this._pinMarker(L, startP, '#2E7D32', this._t('start'), 'start');
-      ms.addTo(this._trackLayer);
-      this._registerGeoMarker(startP, ms, loc => this._popupHtml(startP, this._t('start'), 'start', loc));
-      if (displayed.length > 1) {
-        const me = this._pinMarker(L, endP, '#C62828', this._t('end'), 'end');
-        me.addTo(this._trackLayer);
-        this._registerGeoMarker(endP, me, loc => this._popupHtml(endP, this._t('end'), 'end', loc));
-      }
-    }
+    // Stop markers (start/end pins + numbered mid stops) are drawn separately in
+    // _renderStops so they can be re-grouped on zoom: markers that would overlap
+    // collapse into one combined marker and split again when zoomed in. The node
+    // list mirrors what used to be drawn here — the first point as the start, the
+    // last as the end, and every mid cluster in between.
+    const stopNodes = [{ p: startP, role: 'start' }];
+    displayed.forEach(p => { if (p.stopRole === 'mid') stopNodes.push({ p, role: 'mid' }); });
+    if (displayed.length > 1) stopNodes.push({ p: endP, role: 'end' });
+    this._stopNodes = stopNodes;
+    this._sameZone = sameZone;
 
     this._bounds = L.latLngBounds(latlngs);
     this._map.fitBounds(this._bounds, { padding: [32, 32], animate: false });
+    this._renderStops(L);
     return displayed;
   }
 
@@ -1155,6 +1149,158 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       .bindPopup(this._popupHtml(point, `${this._t('stop_n')} ${point.stopNo}`));
   }
 
+  // Render the stop markers into their own layer. Re-run on every load AND on
+  // every zoom change: markers whose icons would overlap at the current zoom are
+  // collapsed into one combined marker, and split apart again as you zoom in and
+  // there is room. `_stopNodes` is the list of stops to place (built in
+  // _drawTrack); each is `{ p, role }` with role start/end/mid.
+  _renderStops(L) {
+    if (!this._map || !this._stopNodes) return;
+    if (!this._stopLayer) this._stopLayer = L.layerGroup().addTo(this._map);
+    this._stopLayer.clearLayers();
+    // Markers are recreated here, so drop the previous set's popup rebuilders
+    // before registering the new ones (the timeline location spans are addressed
+    // separately by data-geo and are unaffected).
+    this._geoMarkers = new Map();
+
+    const nodes = this._stopNodes;
+    const n = nodes.length;
+    if (n === 0) return;
+
+    // Group markers whose centres overlap at the current zoom. Pixel positions
+    // depend only on zoom (not pan), so this only needs recomputing on zoomend.
+    const pts = nodes.map(nd => this._map.latLngToLayerPoint([nd.p.lat, nd.p.lng]));
+    const parent = nodes.map((_, i) => i);
+    const find = x => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
+    const union = (a, b) => { a = find(a); b = find(b); if (a !== b) parent[a] = b; };
+
+    // A start/end sharing a place (within cluster_radius) stays merged at every
+    // zoom — the polyline ends are snapped to their midpoint, so splitting them
+    // would leave the line short of the markers.
+    if (this._sameZone) {
+      const si = nodes.findIndex(nd => nd.role === 'start');
+      const ei = nodes.findIndex(nd => nd.role === 'end');
+      if (si !== -1 && ei !== -1) union(si, ei);
+    }
+    for (let i = 0; i < n; i++)
+      for (let j = i + 1; j < n; j++)
+        if (pts[i].distanceTo(pts[j]) < MARKER_OVERLAP_PX) union(i, j);
+
+    const groups = new Map();
+    for (let i = 0; i < n; i++) {
+      const r = find(i);
+      if (!groups.has(r)) groups.set(r, []);
+      groups.get(r).push(nodes[i]);
+    }
+
+    for (const members of groups.values()) {
+      if (members.length === 1) this._addStopMarker(L, members[0]);
+      else this._addMergedStop(L, members);
+    }
+
+    // Re-apply any addresses resolved so far this load onto the fresh markers.
+    this._relabelLocations(this._loadGen);
+  }
+
+  // A single (non-overlapping) stop: the usual green/red pin or numbered marker.
+  _addStopMarker(L, node) {
+    const p = node.p;
+    if (node.role === 'start') {
+      const m = this._pinMarker(L, p, '#2E7D32', this._t('start'), 'start');
+      m.addTo(this._stopLayer);
+      this._registerGeoMarker(p, m, loc => this._popupHtml(p, this._t('start'), 'start', loc));
+    } else if (node.role === 'end') {
+      const m = this._pinMarker(L, p, '#C62828', this._t('end'), 'end');
+      m.addTo(this._stopLayer);
+      this._registerGeoMarker(p, m, loc => this._popupHtml(p, this._t('end'), 'end', loc));
+    } else {
+      const m = this._clusterMarker(L, p);
+      m.addTo(this._stopLayer);
+      this._registerGeoMarker(p, m, loc => this._popupHtml(p, `${this._t('stop_n')} ${p.stopNo}`, '', loc));
+    }
+  }
+
+  // Several stops overlap at this zoom → one combined marker at their centroid.
+  // Colour follows the roles involved: green if the start is in the group, red if
+  // the end is, half green/half red if both, orange otherwise. The label is the
+  // range of mid stop numbers (e.g. "2-4"); start/end have no number.
+  _addMergedStop(L, members) {
+    const hasStart = members.some(nd => nd.role === 'start');
+    const hasEnd   = members.some(nd => nd.role === 'end');
+    const nums     = members.filter(nd => nd.role === 'mid')
+      .map(nd => nd.p.stopNo).sort((a, b) => a - b);
+
+    const startNode = members.find(nd => nd.role === 'start');
+    const endNode   = members.find(nd => nd.role === 'end');
+
+    // Start + end with nothing in between is the existing combined marker: keep
+    // its midpoint position and shared popup so it still meets the snapped line.
+    if (hasStart && hasEnd && nums.length === 0) {
+      const m = this._startEndMarker(L, startNode.p, endNode.p);
+      m.addTo(this._stopLayer);
+      this._registerGeoMarker(startNode.p, m, loc => this._startEndPopup(startNode.p, endNode.p, loc));
+      return;
+    }
+
+    const bg = hasStart && hasEnd
+      ? 'linear-gradient(90deg,#2E7D32 0 50%,#C62828 50% 100%)'
+      : hasStart ? '#2E7D32'
+      : hasEnd ? '#C62828'
+      : '#F57C00';
+    const label = nums.length === 0 ? ''
+      : nums.length === 1 ? `${nums[0]}`
+      : `${nums[0]}-${nums[nums.length - 1]}`;
+
+    const lat = members.reduce((a, nd) => a + nd.p.lat, 0) / members.length;
+    const lng = members.reduce((a, nd) => a + nd.p.lng, 0) / members.length;
+    const ordered = [...members].sort((a, b) => a.p.time - b.p.time);
+
+    const icon = L.divIcon({
+      html: `<div style="
+        background:${bg};color:#fff;
+        width:30px;height:30px;border-radius:50%;
+        display:flex;align-items:center;justify-content:center;
+        font-size:11px;font-weight:700;
+        border:2px solid rgba(255,255,255,.9);
+        box-shadow:0 2px 6px rgba(0,0,0,.3);
+      ">${label}</div>`,
+      className: '',
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+      popupAnchor: [0, -18],
+    });
+    const m = L.marker([lat, lng], { icon }).bindPopup(this._mergedPopup(ordered));
+    m.addTo(this._stopLayer);
+    // Register every member so an incoming address rebuilds the combined popup.
+    for (const nd of ordered) this._registerGeoMarker(nd.p, m, () => this._mergedPopup(ordered));
+  }
+
+  // Popup for a combined marker: one line per stop it represents, in time order.
+  _mergedPopup(nodes) {
+    const fmt = t => this._fmtTime(t);
+    const lines = nodes.map(nd => {
+      const p = nd.p;
+      const where = this._locFor(p);
+      const title = nd.role === 'start' ? this._t('start')
+        : nd.role === 'end' ? this._t('end')
+        : `${this._t('stop_n')} ${p.stopNo}`;
+      const head = where ? `${title} (${where})` : title;
+      const time = nd.role === 'start' ? fmt(p.timeTo ?? p.time)
+        : nd.role === 'end' ? fmt(p.time)
+        : `${fmt(p.time)} – ${fmt(p.timeTo)}`;
+      return `<div><strong>${head}</strong> 🕐 ${time}</div>`;
+    });
+    return `<div style="min-width:140px">${lines.join('')}</div>`;
+  }
+
+  // Current best location label for a stop: a resolved reverse-geocoded address
+  // if one has arrived this load, else the HA zone name (or null).
+  _locFor(p) {
+    const addr = this._geoResolved.get(this._geoKey(p));
+    if (addr) { const l = this._composeAddress(addr); if (l) return l; }
+    return this._zoneName(p);
+  }
+
   _clusterPoints(points, radiusMeters, minPoints = 3) {
     if (!radiusMeters || points.length === 0) return points.map(p => ({ ...p, count: 1 }));
     const minPts = Math.max(2, minPoints || 3);
@@ -1217,6 +1363,8 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       this._map = null;
     }
     this._trackLayer = null;
+    this._stopLayer = null;
+    this._stopNodes = null;
     this._tileLayer = null;
     this._tileTheme = null;
     this._geoQueue = [];
