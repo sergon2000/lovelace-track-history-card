@@ -1277,13 +1277,20 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     // they spread out and split into individual markers (a re-render on zoomend),
     // letting the user drill into that area instead of reading a list.
     const m = L.marker([lat, lng], { icon }).on('click', () => {
-      const bounds = L.latLngBounds(memberLatLngs);
-      // Always zoom in at least one level (never out): the marker only exists
-      // because the stops overlap at the current zoom, so fitting their bounds
-      // separates them; +1 guarantees progress even for near-coincident stops.
-      const fit = this._map.getBoundsZoom(bounds, false, L.point(60, 60));
-      const zoom = Math.max(fit, this._map.getZoom() + 1);
-      this._map.setView(bounds.getCenter(), zoom, { animate: false });
+      // Zoom in just enough to break the overlap, not more. The stops merged
+      // because the closest pair is within MARKER_OVERLAP_PX at the current zoom;
+      // each zoom level doubles the on-screen gap, so find the smallest number of
+      // levels that pushes that closest pair past the threshold (+ a little margin
+      // so it doesn't immediately re-merge). Avoids jumping to max zoom when the
+      // stops are near-coincident.
+      const pts = memberLatLngs.map(ll => this._map.latLngToLayerPoint(ll));
+      let dmin = Infinity;
+      for (let i = 0; i < pts.length; i++)
+        for (let j = i + 1; j < pts.length; j++)
+          dmin = Math.min(dmin, pts[i].distanceTo(pts[j]));
+      const need = dmin > 0 ? Math.ceil(Math.log2((MARKER_OVERLAP_PX + 4) / dmin)) : 1;
+      const zoom = Math.min(this._map.getMaxZoom(), this._map.getZoom() + Math.max(1, need));
+      this._map.setView(L.latLngBounds(memberLatLngs).getCenter(), zoom, { animate: false });
     });
     m.addTo(this._stopLayer);
   }
