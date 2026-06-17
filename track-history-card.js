@@ -1279,18 +1279,23 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     const m = L.marker([lat, lng], { icon }).on('click', () => {
       // Zoom in just enough to break the overlap, not more. The stops merged
       // because the closest pair is within MARKER_OVERLAP_PX at the current zoom;
-      // each zoom level doubles the on-screen gap, so find the smallest number of
-      // levels that pushes that closest pair past the threshold (+ a little margin
-      // so it doesn't immediately re-merge). Avoids jumping to max zoom when the
-      // stops are near-coincident.
+      // each zoom level doubles the on-screen gap, so the smallest number of
+      // levels that clears the threshold is ceil(log2(threshold / dmin)). No
+      // margin: grouping uses a strict '<', so hitting the threshold exactly
+      // already separates them — a margin would only push past an extra level.
       const pts = memberLatLngs.map(ll => this._map.latLngToLayerPoint(ll));
       let dmin = Infinity;
       for (let i = 0; i < pts.length; i++)
         for (let j = i + 1; j < pts.length; j++)
           dmin = Math.min(dmin, pts[i].distanceTo(pts[j]));
-      const need = dmin > 0 ? Math.ceil(Math.log2((MARKER_OVERLAP_PX + 4) / dmin)) : 1;
-      const zoom = Math.min(this._map.getMaxZoom(), this._map.getZoom() + Math.max(1, need));
-      this._map.setView(L.latLngBounds(memberLatLngs).getCenter(), zoom, { animate: false });
+      const need = dmin > 0 && dmin < MARKER_OVERLAP_PX
+        ? Math.ceil(Math.log2(MARKER_OVERLAP_PX / dmin))
+        : 1;
+      // fitBounds centres and frames the stops; capping its zoom keeps a tight,
+      // near-coincident pair from jumping to max zoom (it stops at the level that
+      // just separates them), while a spread-out group still fits at a lower zoom.
+      const maxZoom = Math.min(this._map.getMaxZoom(), this._map.getZoom() + Math.max(1, need));
+      this._map.fitBounds(L.latLngBounds(memberLatLngs), { padding: [30, 30], maxZoom, animate: false });
     });
     m.addTo(this._stopLayer);
   }
