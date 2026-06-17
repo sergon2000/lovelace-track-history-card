@@ -132,8 +132,8 @@ A combined marker:
 - is placed at the **centroid** of the stops it represents;
 - is **coloured** by the roles involved — green if the start is in the group, red
   if the end is, half-green/half-red if both, orange otherwise;
-- is **labelled** with the range of mid stop numbers it covers (`2-4`; a single
-  number when only one mid stop, blank when it's only start/end);
+- shows a **"multiple" glyph** (overlapping squares, `MERGED_MARKER_SVG`) to mark
+  it as standing for several stops rather than a single one;
 - has a **popup** listing each stop it represents (title + location + time), in
   time order.
 

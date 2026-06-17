@@ -34,6 +34,14 @@ const GEO_CACHE_PREFIX = 'thc:geo:';
 // visually overlap); they split apart again as you zoom in. See _renderStops.
 const MARKER_OVERLAP_PX = 28;
 
+// Glyph drawn on a combined marker (overlapping squares) to signal that it stands
+// for several stops, rather than spelling out the stop-number range. `currentColor`
+// inherits the marker's white text colour. See _addMergedStop.
+const MERGED_MARKER_SVG =
+  '<svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true" style="display:block">' +
+  '<path fill="currentColor" d="M3 5H1v16c0 1.1.9 2 2 2h16v-2H3V5zm18-4H7c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V3c0-1.1-.9-2-2-2zm0 16H7V3h14v14z"/>' +
+  '</svg>';
+
 // Numeric config limits — the single source of truth for each field's default
 // and the range enforced in setConfig, the editor inputs and the editor labels.
 // Change a value here and it propagates everywhere.
@@ -1222,20 +1230,20 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
   // Several stops overlap at this zoom → one combined marker at their centroid.
   // Colour follows the roles involved: green if the start is in the group, red if
-  // the end is, half green/half red if both, orange otherwise. The label is the
-  // range of mid stop numbers (e.g. "2-4"); start/end have no number.
+  // the end is, half green/half red if both, orange otherwise. A "multiple" glyph
+  // (MERGED_MARKER_SVG) marks it as standing for more than one stop.
   _addMergedStop(L, members) {
     const hasStart = members.some(nd => nd.role === 'start');
     const hasEnd   = members.some(nd => nd.role === 'end');
-    const nums     = members.filter(nd => nd.role === 'mid')
-      .map(nd => nd.p.stopNo).sort((a, b) => a - b);
+    const onlyStartEnd = hasStart && hasEnd
+      && !members.some(nd => nd.role === 'mid');
 
     const startNode = members.find(nd => nd.role === 'start');
     const endNode   = members.find(nd => nd.role === 'end');
 
     // Start + end with nothing in between is the existing combined marker: keep
     // its midpoint position and shared popup so it still meets the snapped line.
-    if (hasStart && hasEnd && nums.length === 0) {
+    if (onlyStartEnd) {
       const m = this._startEndMarker(L, startNode.p, endNode.p);
       m.addTo(this._stopLayer);
       this._registerGeoMarker(startNode.p, m, loc => this._startEndPopup(startNode.p, endNode.p, loc));
@@ -1247,9 +1255,6 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       : hasStart ? '#2E7D32'
       : hasEnd ? '#C62828'
       : '#F57C00';
-    const label = nums.length === 0 ? ''
-      : nums.length === 1 ? `${nums[0]}`
-      : `${nums[0]}-${nums[nums.length - 1]}`;
 
     const lat = members.reduce((a, nd) => a + nd.p.lat, 0) / members.length;
     const lng = members.reduce((a, nd) => a + nd.p.lng, 0) / members.length;
@@ -1260,10 +1265,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         background:${bg};color:#fff;
         width:30px;height:30px;border-radius:50%;
         display:flex;align-items:center;justify-content:center;
-        font-size:11px;font-weight:700;
         border:2px solid rgba(255,255,255,.9);
         box-shadow:0 2px 6px rgba(0,0,0,.3);
-      ">${label}</div>`,
+      ">${MERGED_MARKER_SVG}</div>`,
       className: '',
       iconSize: [30, 30],
       iconAnchor: [15, 15],

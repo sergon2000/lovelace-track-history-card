@@ -111,8 +111,8 @@ shadowRoot (`_injectLeafletCss`).
 - **Zoom-based merging** (`_renderStops`): stop markers live in their own layer
   (`_stopLayer`) and are re-grouped on every `zoomend`. Markers within
   `MARKER_OVERLAP_PX` (28 px) at the current zoom merge into one combined marker
-  (centroid position, range label e.g. `2-4`, coloured by whether start/end are
-  involved — green/red/half-half/orange, popup lists every stop) and split again
+  (centroid position, a "multiple" glyph `MERGED_MARKER_SVG`, coloured by whether
+  start/end are involved — green/red/half-half/orange, popup lists every stop) and split again
   when zoomed in. `_drawTrack` builds the `_stopNodes` list and draws the polyline;
   `_renderStops` (called there and on zoom) places the markers. See CLUSTERING.md.
 
