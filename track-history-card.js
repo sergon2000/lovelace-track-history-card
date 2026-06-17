@@ -1258,7 +1258,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
 
     const lat = members.reduce((a, nd) => a + nd.p.lat, 0) / members.length;
     const lng = members.reduce((a, nd) => a + nd.p.lng, 0) / members.length;
-    const ordered = [...members].sort((a, b) => a.p.time - b.p.time);
+    const memberLatLngs = members.map(nd => [nd.p.lat, nd.p.lng]);
 
     const icon = L.divIcon({
       html: `<div style="
@@ -1267,42 +1267,25 @@ class LovelaceTrackHistoryCard extends HTMLElement {
         display:flex;align-items:center;justify-content:center;
         border:2px solid rgba(255,255,255,.9);
         box-shadow:0 2px 6px rgba(0,0,0,.3);
+        cursor:pointer;
       ">${MERGED_MARKER_SVG}</div>`,
       className: '',
       iconSize: [30, 30],
       iconAnchor: [15, 15],
-      popupAnchor: [0, -18],
     });
-    const m = L.marker([lat, lng], { icon }).bindPopup(this._mergedPopup(ordered));
+    // No popup: clicking a combined marker zooms in on the stops it covers so
+    // they spread out and split into individual markers (a re-render on zoomend),
+    // letting the user drill into that area instead of reading a list.
+    const m = L.marker([lat, lng], { icon }).on('click', () => {
+      const bounds = L.latLngBounds(memberLatLngs);
+      // Always zoom in at least one level (never out): the marker only exists
+      // because the stops overlap at the current zoom, so fitting their bounds
+      // separates them; +1 guarantees progress even for near-coincident stops.
+      const fit = this._map.getBoundsZoom(bounds, false, L.point(60, 60));
+      const zoom = Math.max(fit, this._map.getZoom() + 1);
+      this._map.setView(bounds.getCenter(), zoom, { animate: false });
+    });
     m.addTo(this._stopLayer);
-    // Register every member so an incoming address rebuilds the combined popup.
-    for (const nd of ordered) this._registerGeoMarker(nd.p, m, () => this._mergedPopup(ordered));
-  }
-
-  // Popup for a combined marker: one line per stop it represents, in time order.
-  _mergedPopup(nodes) {
-    const fmt = t => this._fmtTime(t);
-    const lines = nodes.map(nd => {
-      const p = nd.p;
-      const where = this._locFor(p);
-      const title = nd.role === 'start' ? this._t('start')
-        : nd.role === 'end' ? this._t('end')
-        : `${this._t('stop_n')} ${p.stopNo}`;
-      const head = where ? `${title} (${where})` : title;
-      const time = nd.role === 'start' ? fmt(p.timeTo ?? p.time)
-        : nd.role === 'end' ? fmt(p.time)
-        : `${fmt(p.time)} – ${fmt(p.timeTo)}`;
-      return `<div><strong>${head}</strong> 🕐 ${time}</div>`;
-    });
-    return `<div style="min-width:140px">${lines.join('')}</div>`;
-  }
-
-  // Current best location label for a stop: a resolved reverse-geocoded address
-  // if one has arrived this load, else the HA zone name (or null).
-  _locFor(p) {
-    const addr = this._geoResolved.get(this._geoKey(p));
-    if (addr) { const l = this._composeAddress(addr); if (l) return l; }
-    return this._zoneName(p);
   }
 
   _clusterPoints(points, radiusMeters, minPoints = 3) {

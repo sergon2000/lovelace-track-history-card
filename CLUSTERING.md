@@ -134,8 +134,9 @@ A combined marker:
   if the end is, half-green/half-red if both, orange otherwise;
 - shows a **"multiple" glyph** (overlapping squares, `MERGED_MARKER_SVG`) to mark
   it as standing for several stops rather than a single one;
-- has a **popup** listing each stop it represents (title + location + time), in
-  time order.
+- has **no popup** — clicking it instead zooms in on the stops it covers
+  (`fitBounds`-style, always at least one level deeper), so they spread out and
+  re-render as individual markers, letting the user drill into that area.
 
 The pre-existing combined start/end marker (start and end within `cluster_radius`,
 `sameZone`) is just the special case where the group is exactly {start, end} with
