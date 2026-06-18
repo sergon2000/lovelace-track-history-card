@@ -49,7 +49,7 @@ const LIMITS = {
   map_height:     { min: 200, max: 1000, def: 450 },
   cluster_radius: { min:  50, max:  500, def: 200 },
   min_points:     { min:   2, max:    5, def:   3 },
-  min_time:       { min:   1, max:   30, def:   5 },
+  min_time:       { min:   1, max:   30, def:  10 },
   arrow_count:    { min:  10, max:   30, def:  30 },
 };
 

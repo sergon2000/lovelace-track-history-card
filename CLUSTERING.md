@@ -33,7 +33,7 @@ The result of `_clusterPoints` is referred to as `displayed` throughout.
 |------------------|---------|-------------------------------------------------------------------------|
 | `cluster_radius` | `200` m | Points within this distance of a cluster's running centroid join it.    |
 | `min_points`     | `3`     | A group needs at least this many points to count as a cluster (a stop). |
-| `min_time`       | `5` min | A group must also span at least this many minutes (first → last point) to count as a cluster. Both conditions must hold. Range `1`–`30`. |
+| `min_time`       | `10` min| A group must also span at least this many minutes (first → last point) to count as a cluster. Both conditions must hold. Range `1`–`30`. |
 
 ## Clustering algorithm (`_clusterPoints`)
 

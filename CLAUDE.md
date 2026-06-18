@@ -60,7 +60,7 @@ shadowRoot (`_injectLeafletCss`).
 | `units`          | `metric`    | `metric` (m/km) or `imperial` (ft/mi). Sets `cluster_radius` unit too. |
 | `cluster_radius` | `200`       | In `units` (m / ft), range 50–500. Converted to metres internally. See CLUSTERING.md. |
 | `min_points`     | `3`         | Min consecutive points for a stop (range 2–5). See CLUSTERING.md. |
-| `min_time`       | `5`         | Min minutes a cluster must span (first→last point) to be a stop (range 1–30). Combined with `min_points`: both must hold. See CLUSTERING.md. |
+| `min_time`       | `10`        | Min minutes a cluster must span (first→last point) to be a stop (range 1–30). Combined with `min_points`: both must hold. See CLUSTERING.md. |
 | `reverse_geocode`| `false`     | Opt-in: address-label stops outside any HA zone via reverse geocoding. See gotcha below + CLUSTERING.md. |
 | `geocode_url`    | Nominatim   | Reverse endpoint (Nominatim-compatible). Default `https://nominatim.openstreetmap.org/reverse`. |
 
