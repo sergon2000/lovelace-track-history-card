@@ -1286,31 +1286,59 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       iconSize: [30, 30],
       iconAnchor: [15, 15],
     });
-    // No popup: clicking a combined marker zooms in on the stops it covers so
-    // they spread out and split into individual markers (a re-render on zoomend),
-    // letting the user drill into that area instead of reading a list.
+    // Clicking a combined marker zooms in on the stops it covers so they spread
+    // out and split into individual markers (a re-render on zoomend), letting the
+    // user drill into that area instead of reading a list.
     const m = L.marker([lat, lng], { icon }).on('click', () => {
-      // Zoom in just enough to break the overlap, not more. The stops merged
-      // because the closest pair is within MARKER_OVERLAP_PX at the current zoom;
-      // each zoom level doubles the on-screen gap, so the smallest number of
-      // levels that clears the threshold is ceil(log2(threshold / dmin)). No
-      // margin: grouping uses a strict '<', so hitting the threshold exactly
-      // already separates them — a margin would only push past an extra level.
+      // Closest pair, in screen pixels at the current zoom.
+      const z = this._map.getZoom();
+      const maxMapZoom = this._map.getMaxZoom();
       const pts = memberLatLngs.map(ll => this._map.latLngToLayerPoint(ll));
       let dmin = Infinity;
       for (let i = 0; i < pts.length; i++)
         for (let j = i + 1; j < pts.length; j++)
           dmin = Math.min(dmin, pts[i].distanceTo(pts[j]));
+      // Each zoom level doubles the on-screen gap, so at the map's max zoom the
+      // closest pair would be dmin * 2^(maxZoom - z) px apart. If that still
+      // doesn't clear MARKER_OVERLAP_PX, no amount of zoom can split the group
+      // (the stops are virtually on top of each other) — zooming would just walk
+      // to max zoom and then do nothing, leaving it merged. Show the stops in a
+      // popup instead.
+      if (dmin > 0 && dmin * Math.pow(2, maxMapZoom - z) < MARKER_OVERLAP_PX) {
+        L.popup({ offset: [0, -10] })
+          .setLatLng([lat, lng])
+          .setContent(this._mergedPopup(members))
+          .openOn(this._map);
+        return;
+      }
+      // Otherwise zoom in just enough to break the overlap, not more. The stops
+      // merged because the closest pair is within MARKER_OVERLAP_PX; the smallest
+      // number of levels that clears the threshold is ceil(log2(threshold / dmin)).
+      // No margin: grouping uses a strict '<', so hitting the threshold exactly
+      // already separates them — a margin would only push past an extra level.
       const need = dmin > 0 && dmin < MARKER_OVERLAP_PX
         ? Math.ceil(Math.log2(MARKER_OVERLAP_PX / dmin))
         : 1;
       // fitBounds centres and frames the stops; capping its zoom keeps a tight,
       // near-coincident pair from jumping to max zoom (it stops at the level that
       // just separates them), while a spread-out group still fits at a lower zoom.
-      const maxZoom = Math.min(this._map.getMaxZoom(), this._map.getZoom() + Math.max(1, need));
+      const maxZoom = Math.min(maxMapZoom, z + Math.max(1, need));
       this._map.fitBounds(L.latLngBounds(memberLatLngs), { padding: [30, 30], maxZoom, animate: false });
     });
     m.addTo(this._stopLayer);
+  }
+
+  // Fallback popup for a combined marker that can't be split by zoom (its stops
+  // are virtually coincident). Lists each stop it covers with its time(s).
+  _mergedPopup(members) {
+    const fmt = t => this._fmtTime(t);
+    const rows = members.map(nd => {
+      const p = nd.p;
+      if (nd.role === 'start') return `<strong>${this._t('start')}</strong> 🕐 ${fmt(p.timeTo ?? p.time)}`;
+      if (nd.role === 'end')   return `<strong>${this._t('end')}</strong> 🕐 ${fmt(p.time)}`;
+      return `<strong>${this._t('stop_n')} ${p.stopNo}</strong> 🕐 ${fmt(p.time)} – ${fmt(p.timeTo)}`;
+    });
+    return `<div style="min-width:120px">${rows.join('<br>')}</div>`;
   }
 
   _clusterPoints(points, radiusMeters, minPoints = 3, minMinutes = 0) {

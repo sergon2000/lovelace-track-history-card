@@ -138,10 +138,14 @@ A combined marker:
   if the end is, half-green/half-red if both, orange otherwise;
 - shows a **"multiple" glyph** (overlapping squares, `MERGED_MARKER_SVG`) to mark
   it as standing for several stops rather than a single one;
-- has **no popup** — clicking it instead zooms in on the stops it covers, by just
-  enough levels to push the closest pair past `MARKER_OVERLAP_PX` (not straight to
-  max zoom), so they spread out and re-render as individual markers and the user
-  can drill into that area.
+- **clicking it zooms in** on the stops it covers, by just enough levels to push
+  the closest pair past `MARKER_OVERLAP_PX` (not straight to max zoom), so they
+  spread out and re-render as individual markers and the user can drill into that
+  area. **Exception:** if the closest pair is so close it would *still* overlap at
+  the map's max zoom (`dmin · 2^(maxZoom − z) < MARKER_OVERLAP_PX`), zooming could
+  never split the group, so clicking instead opens a small popup (`_mergedPopup`)
+  listing the stops it covers with their times — otherwise the click would just
+  walk to max zoom and then do nothing while still merged.
 
 The pre-existing combined start/end marker (start and end within `cluster_radius`,
 `sameZone`) is just the special case where the group is exactly {start, end} with
