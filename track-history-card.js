@@ -89,6 +89,7 @@ const TRANSLATIONS = {
     arrow_count_lbl:   'Number of arrows',
     stop_n:            'Stop',
     moving:            'Moving',
+    points:            'points',
     recenter:          'Recenter',
     default_title:     'Track History',
   },
@@ -126,6 +127,7 @@ const TRANSLATIONS = {
     arrow_count_lbl:   'Número de flechas',
     stop_n:            'Parada',
     moving:            'En movimiento',
+    points:            'puntos',
     recenter:          'Recentrar',
     default_title:     'Track History',
   },
@@ -163,6 +165,7 @@ const TRANSLATIONS = {
     arrow_count_lbl:   'Nombre de flèches',
     stop_n:            'Arrêt',
     moving:            'En mouvement',
+    points:            'points',
     recenter:          'Recentrer',
     default_title:     'Track History',
   },
@@ -200,6 +203,7 @@ const TRANSLATIONS = {
     arrow_count_lbl:   'Anzahl der Pfeile',
     stop_n:            'Halt',
     moving:            'In Bewegung',
+    points:            'Punkte',
     recenter:          'Neu zentrieren',
     default_title:     'Track History',
   },
@@ -237,6 +241,7 @@ const TRANSLATIONS = {
     arrow_count_lbl:   'Numero di frecce',
     stop_n:            'Sosta',
     moving:            'In movimento',
+    points:            'punti',
     recenter:          'Ricentra',
     default_title:     'Track History',
   },
@@ -274,6 +279,7 @@ const TRANSLATIONS = {
     arrow_count_lbl:   'Número de setas',
     stop_n:            'Paragem',
     moving:            'Em movimento',
+    points:            'pontos',
     recenter:          'Recentrar',
     default_title:     'Track History',
   },
@@ -1122,10 +1128,14 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       : point.count > 1
       ? `🕐 ${fmt(point.time)} – ${fmt(point.timeTo)} (${this._fmtDuration(point.timeTo - point.time)})`
       : `🕐 ${fmt(point.time)}`;
+    // Mid stops also show how many recorded positions make up the cluster.
+    const countHtml = role !== 'start' && role !== 'end' && point.count > 1
+      ? `<br>📍 ${point.count} ${this._t('points')}`
+      : '';
     return `
       <div style="min-width:120px">
         ${labelText ? `<strong>${labelText}</strong><br>` : ''}
-        ${timeHtml}
+        ${timeHtml}${countHtml}
       </div>`;
   }
 
