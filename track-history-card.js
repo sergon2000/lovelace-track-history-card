@@ -1290,39 +1290,38 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     // out and split into individual markers (a re-render on zoomend), letting the
     // user drill into that area instead of reading a list.
     const m = L.marker([lat, lng], { icon }).on('click', () => {
-      // Closest pair, in screen pixels at the current zoom.
-      const z = this._map.getZoom();
+      // Closest pair in pixels AT THE MAP'S MAX ZOOM (project at a fixed zoom,
+      // independent of the current one). Measuring at the current zoom is
+      // unreliable: when the stops are tightly packed and the map is zoomed out
+      // they round to the same pixel (dmin = 0), which hid the unsplittable test
+      // until the user had clicked-zoomed in several times. Projecting at max
+      // zoom gives the true best-case separation in one shot.
       const maxMapZoom = this._map.getMaxZoom();
-      const pts = memberLatLngs.map(ll => this._map.latLngToLayerPoint(ll));
-      let dmin = Infinity;
-      for (let i = 0; i < pts.length; i++)
-        for (let j = i + 1; j < pts.length; j++)
-          dmin = Math.min(dmin, pts[i].distanceTo(pts[j]));
-      // Each zoom level doubles the on-screen gap, so at the map's max zoom the
-      // closest pair would be dmin * 2^(maxZoom - z) px apart. If that still
-      // doesn't clear MARKER_OVERLAP_PX, no amount of zoom can split the group
-      // (the stops are virtually on top of each other) — zooming would just walk
-      // to max zoom and then do nothing, leaving it merged. Show the stops in a
-      // popup instead.
-      if (dmin > 0 && dmin * Math.pow(2, maxMapZoom - z) < MARKER_OVERLAP_PX) {
+      const proj = memberLatLngs.map(ll => this._map.project(ll, maxMapZoom));
+      let dmax = Infinity;
+      for (let i = 0; i < proj.length; i++)
+        for (let j = i + 1; j < proj.length; j++)
+          dmax = Math.min(dmax, proj[i].distanceTo(proj[j]));
+      // If even at max zoom the closest pair stays within MARKER_OVERLAP_PX, no
+      // amount of zoom can split the group (the stops are virtually coincident) —
+      // zooming would just walk to max zoom and then do nothing, leaving it
+      // merged. Show the stops in a popup instead, on the first click.
+      if (!(dmax >= MARKER_OVERLAP_PX)) {
         L.popup({ offset: [0, -10] })
           .setLatLng([lat, lng])
           .setContent(this._mergedPopup(members))
           .openOn(this._map);
         return;
       }
-      // Otherwise zoom in just enough to break the overlap, not more. The stops
-      // merged because the closest pair is within MARKER_OVERLAP_PX; the smallest
-      // number of levels that clears the threshold is ceil(log2(threshold / dmin)).
-      // No margin: grouping uses a strict '<', so hitting the threshold exactly
-      // already separates them — a margin would only push past an extra level.
-      const need = dmin > 0 && dmin < MARKER_OVERLAP_PX
-        ? Math.ceil(Math.log2(MARKER_OVERLAP_PX / dmin))
-        : 1;
-      // fitBounds centres and frames the stops; capping its zoom keeps a tight,
-      // near-coincident pair from jumping to max zoom (it stops at the level that
-      // just separates them), while a spread-out group still fits at a lower zoom.
-      const maxZoom = Math.min(maxMapZoom, z + Math.max(1, need));
+      // Otherwise zoom in just enough to break the overlap, not more. Each zoom
+      // level halves the gap below maxZoom, so the smallest level whose on-screen
+      // gap clears the threshold is maxZoom + log2(threshold / dmax) (≤ maxZoom,
+      // since dmax ≥ threshold here). No margin: grouping uses a strict '<', so
+      // hitting the threshold exactly already separates them.
+      const targetZoom = Math.ceil(maxMapZoom + Math.log2(MARKER_OVERLAP_PX / dmax));
+      // fitBounds centres and frames the stops; capping its zoom at targetZoom
+      // lands it exactly there (the tiny bounds would otherwise fit far deeper).
+      const maxZoom = Math.min(maxMapZoom, targetZoom);
       this._map.fitBounds(L.latLngBounds(memberLatLngs), { padding: [30, 30], maxZoom, animate: false });
     });
     m.addTo(this._stopLayer);

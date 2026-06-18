@@ -141,11 +141,15 @@ A combined marker:
 - **clicking it zooms in** on the stops it covers, by just enough levels to push
   the closest pair past `MARKER_OVERLAP_PX` (not straight to max zoom), so they
   spread out and re-render as individual markers and the user can drill into that
-  area. **Exception:** if the closest pair is so close it would *still* overlap at
-  the map's max zoom (`dmin · 2^(maxZoom − z) < MARKER_OVERLAP_PX`), zooming could
-  never split the group, so clicking instead opens a small popup (`_mergedPopup`)
-  listing the stops it covers with their times — otherwise the click would just
-  walk to max zoom and then do nothing while still merged.
+  area. The closest pair is measured by projecting the stops at the map's **max
+  zoom** (`map.project(latlng, maxZoom)`, independent of the current zoom), and
+  the target level is `ceil(maxZoom + log2(MARKER_OVERLAP_PX / dmax))`.
+  **Exception:** if that closest pair is *still* within `MARKER_OVERLAP_PX` even
+  at max zoom, zooming could never split the group, so clicking instead opens a
+  small popup (`_mergedPopup`) listing the stops with their times — decided up
+  front so it happens on the **first** click rather than after walking the zoom
+  to its limit. (Measuring at the current zoom instead would round a tight pair
+  to the same pixel when zoomed out and hide this until several clicks in.)
 
 The pre-existing combined start/end marker (start and end within `cluster_radius`,
 `sameZone`) is just the special case where the group is exactly {start, end} with
