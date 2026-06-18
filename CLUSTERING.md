@@ -138,18 +138,21 @@ A combined marker:
   if the end is, half-green/half-red if both, orange otherwise;
 - shows a **"multiple" glyph** (overlapping squares, `MERGED_MARKER_SVG`) to mark
   it as standing for several stops rather than a single one;
-- **clicking it zooms in** on the stops it covers, by just enough levels to push
-  the closest pair past `MARKER_OVERLAP_PX` (not straight to max zoom), so they
-  spread out and re-render as individual markers and the user can drill into that
-  area. The closest pair is measured by projecting the stops at the map's **max
-  zoom** (`map.project(latlng, maxZoom)`, independent of the current zoom), and
-  the target level is `ceil(maxZoom + log2(MARKER_OVERLAP_PX / dmax))`.
-  **Exception:** if that closest pair is *still* within `MARKER_OVERLAP_PX` even
-  at max zoom, zooming could never split the group, so clicking instead opens a
+- **clicking it zooms in** on the stops it covers, by just enough to break the
+  group apart — not straight to max zoom. The target is the **lowest zoom above
+  the current one at which the group would split into more than one marker**,
+  found by re-running the grouping (`_groupNodesAtZoom`) at each level up to the
+  map's max. So the decision is "would zooming split *anything*?", not "is the
+  closest pair separable?": a group can hold one stop that peels off and another
+  that's coincident with the start/end — one click splits off the separable stop
+  and leaves the rest merged, and the user clicks that again to keep drilling.
+  **Exception:** if *no* level splits the group even at max zoom, the stops are
+  virtually coincident and zooming would do nothing, so clicking instead opens a
   small popup (`_mergedPopup`) listing the stops with their times — decided up
-  front so it happens on the **first** click rather than after walking the zoom
-  to its limit. (Measuring at the current zoom instead would round a tight pair
-  to the same pixel when zoomed out and hide this until several clicks in.)
+  front (by re-grouping at max zoom) so it happens on the **first** click rather
+  than after walking the zoom to its limit. Grouping is done by projecting the
+  stops at an explicit zoom (`map.project(latlng, z)`), so a level can be probed
+  without moving the map and a tight pair is never lost to pixel rounding.
 
 The pre-existing combined start/end marker (start and end within `cluster_radius`,
 `sameZone`) is just the special case where the group is exactly {start, end} with

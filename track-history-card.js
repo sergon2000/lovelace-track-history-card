@@ -1184,20 +1184,32 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     // separately by data-geo and are unaffected).
     this._geoMarkers = new Map();
 
-    const nodes = this._stopNodes;
-    const n = nodes.length;
-    if (n === 0) return;
+    if (this._stopNodes.length === 0) return;
 
-    // Group markers whose centres overlap at the current zoom. Pixel positions
-    // depend only on zoom (not pan), so this only needs recomputing on zoomend.
-    const pts = nodes.map(nd => this._map.latLngToLayerPoint([nd.p.lat, nd.p.lng]));
+    // Group markers whose icons overlap at the current zoom, then draw each group
+    // as one marker (single stop) or a combined marker (several).
+    for (const members of this._groupNodesAtZoom(this._stopNodes, this._map.getZoom())) {
+      if (members.length === 1) this._addStopMarker(L, members[0]);
+      else this._addMergedStop(L, members);
+    }
+
+    // Re-apply any addresses resolved so far this load onto the fresh markers.
+    this._relabelLocations(this._loadGen);
+  }
+
+  // Single-linkage grouping of stop nodes by icon overlap at a given zoom level.
+  // Two nodes merge when their projected centres are within MARKER_OVERLAP_PX, and
+  // a sameZone start/end pair is always merged (their snapped polyline ends mean
+  // they can't be drawn apart). Projecting at an explicit zoom (rather than the
+  // live `latLngToLayerPoint`) lets callers ask "what would the grouping be at
+  // zoom Z?" without changing the map. Returns an array of groups (node arrays).
+  _groupNodesAtZoom(nodes, zoom) {
+    const n = nodes.length;
+    const pts = nodes.map(nd => this._map.project([nd.p.lat, nd.p.lng], zoom));
     const parent = nodes.map((_, i) => i);
     const find = x => { while (parent[x] !== x) { parent[x] = parent[parent[x]]; x = parent[x]; } return x; };
     const union = (a, b) => { a = find(a); b = find(b); if (a !== b) parent[a] = b; };
 
-    // A start/end sharing a place (within cluster_radius) stays merged at every
-    // zoom — the polyline ends are snapped to their midpoint, so splitting them
-    // would leave the line short of the markers.
     if (this._sameZone) {
       const si = nodes.findIndex(nd => nd.role === 'start');
       const ei = nodes.findIndex(nd => nd.role === 'end');
@@ -1213,14 +1225,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       if (!groups.has(r)) groups.set(r, []);
       groups.get(r).push(nodes[i]);
     }
-
-    for (const members of groups.values()) {
-      if (members.length === 1) this._addStopMarker(L, members[0]);
-      else this._addMergedStop(L, members);
-    }
-
-    // Re-apply any addresses resolved so far this load onto the fresh markers.
-    this._relabelLocations(this._loadGen);
+    return [...groups.values()];
   }
 
   // A single (non-overlapping) stop: the usual green/red pin or numbered marker.
@@ -1290,39 +1295,31 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     // out and split into individual markers (a re-render on zoomend), letting the
     // user drill into that area instead of reading a list.
     const m = L.marker([lat, lng], { icon }).on('click', () => {
-      // Closest pair in pixels AT THE MAP'S MAX ZOOM (project at a fixed zoom,
-      // independent of the current one). Measuring at the current zoom is
-      // unreliable: when the stops are tightly packed and the map is zoomed out
-      // they round to the same pixel (dmin = 0), which hid the unsplittable test
-      // until the user had clicked-zoomed in several times. Projecting at max
-      // zoom gives the true best-case separation in one shot.
+      // Find the lowest zoom (above the current one) at which this group would
+      // break into more than one marker, by re-running the grouping at each level
+      // up to the map's max. The decision is "would zooming split ANYTHING?", not
+      // "is the closest pair separable?": a group can hold one stop that splits off
+      // and another that's coincident with the start/end — zooming should peel off
+      // the separable one and leave the rest merged (clicking that again, once it's
+      // truly unsplittable, shows the popup).
       const maxMapZoom = this._map.getMaxZoom();
-      const proj = memberLatLngs.map(ll => this._map.project(ll, maxMapZoom));
-      let dmax = Infinity;
-      for (let i = 0; i < proj.length; i++)
-        for (let j = i + 1; j < proj.length; j++)
-          dmax = Math.min(dmax, proj[i].distanceTo(proj[j]));
-      // If even at max zoom the closest pair stays within MARKER_OVERLAP_PX, no
-      // amount of zoom can split the group (the stops are virtually coincident) —
-      // zooming would just walk to max zoom and then do nothing, leaving it
-      // merged. Show the stops in a popup instead, on the first click.
-      if (!(dmax >= MARKER_OVERLAP_PX)) {
+      let target = null;
+      for (let z = Math.floor(this._map.getZoom()) + 1; z <= maxMapZoom; z++) {
+        if (this._groupNodesAtZoom(members, z).length > 1) { target = z; break; }
+      }
+      // No level splits the group even at max zoom → the stops are virtually
+      // coincident and zooming would do nothing. Show them in a popup instead.
+      if (target === null) {
         L.popup({ offset: [0, -10] })
           .setLatLng([lat, lng])
           .setContent(this._mergedPopup(members))
           .openOn(this._map);
         return;
       }
-      // Otherwise zoom in just enough to break the overlap, not more. Each zoom
-      // level halves the gap below maxZoom, so the smallest level whose on-screen
-      // gap clears the threshold is maxZoom + log2(threshold / dmax) (≤ maxZoom,
-      // since dmax ≥ threshold here). No margin: grouping uses a strict '<', so
-      // hitting the threshold exactly already separates them.
-      const targetZoom = Math.ceil(maxMapZoom + Math.log2(MARKER_OVERLAP_PX / dmax));
-      // fitBounds centres and frames the stops; capping its zoom at targetZoom
-      // lands it exactly there (the tiny bounds would otherwise fit far deeper).
-      const maxZoom = Math.min(maxMapZoom, targetZoom);
-      this._map.fitBounds(L.latLngBounds(memberLatLngs), { padding: [30, 30], maxZoom, animate: false });
+      // Zoom just to that first-split level (no more): fitBounds frames and centres
+      // the stops, and capping its zoom at `target` lands it exactly there (the
+      // tiny bounds would otherwise fit far deeper).
+      this._map.fitBounds(L.latLngBounds(memberLatLngs), { padding: [30, 30], maxZoom: target, animate: false });
     });
     m.addTo(this._stopLayer);
   }
