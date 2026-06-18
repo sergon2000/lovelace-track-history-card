@@ -49,6 +49,7 @@ const LIMITS = {
   map_height:     { min: 200, max: 1000, def: 450 },
   cluster_radius: { min:  50, max:  500, def: 200 },
   min_points:     { min:   2, max:    5, def:   3 },
+  min_time:       { min:   1, max:   30, def:   5 },
   arrow_count:    { min:  10, max:   30, def:  30 },
 };
 
@@ -75,6 +76,7 @@ const TRANSLATIONS = {
     remove:            'Remove',
     cluster_radius_lbl:'Cluster radius',
     min_points_lbl:    'Minimum points per cluster',
+    min_time_lbl:      'Minimum time per cluster (min)',
     reverse_geocode_lbl: 'Reverse geocoding (address for stops outside zones)',
     units_lbl:         'Units',
     units_metric:      'Metric',
@@ -112,6 +114,7 @@ const TRANSLATIONS = {
     remove:            'Eliminar',
     cluster_radius_lbl:'Radio de agrupación',
     min_points_lbl:    'Puntos mínimos por agrupación',
+    min_time_lbl:      'Tiempo mínimo por agrupación (min)',
     reverse_geocode_lbl: 'Geocodificación inversa (dirección de paradas fuera de zonas)',
     units_lbl:         'Sistema de medida',
     units_metric:      'Métrico',
@@ -149,6 +152,7 @@ const TRANSLATIONS = {
     remove:            'Supprimer',
     cluster_radius_lbl:'Rayon de regroupement',
     min_points_lbl:    'Points minimum par regroupement',
+    min_time_lbl:      'Temps minimum par regroupement (min)',
     reverse_geocode_lbl: 'Géocodage inversé (adresse des arrêts hors zones)',
     units_lbl:         'Unités',
     units_metric:      'Métrique',
@@ -186,6 +190,7 @@ const TRANSLATIONS = {
     remove:            'Entfernen',
     cluster_radius_lbl:'Gruppierungsradius',
     min_points_lbl:    'Mindestpunkte pro Gruppierung',
+    min_time_lbl:      'Mindestzeit pro Gruppierung (Min.)',
     reverse_geocode_lbl: 'Reverse-Geocoding (Adresse für Stopps außerhalb von Zonen)',
     units_lbl:         'Einheiten',
     units_metric:      'Metrisch',
@@ -223,6 +228,7 @@ const TRANSLATIONS = {
     remove:            'Rimuovi',
     cluster_radius_lbl:'Raggio di raggruppamento',
     min_points_lbl:    'Punti minimi per raggruppamento',
+    min_time_lbl:      'Tempo minimo per raggruppamento (min)',
     reverse_geocode_lbl: 'Geocodifica inversa (indirizzo delle soste fuori dalle zone)',
     units_lbl:         'Unità di misura',
     units_metric:      'Metrico',
@@ -260,6 +266,7 @@ const TRANSLATIONS = {
     remove:            'Remover',
     cluster_radius_lbl:'Raio de agrupamento',
     min_points_lbl:    'Pontos mínimos por agrupamento',
+    min_time_lbl:      'Tempo mínimo por agrupamento (min)',
     reverse_geocode_lbl: 'Geocodificação inversa (endereço de paradas fora das zonas)',
     units_lbl:         'Unidades',
     units_metric:      'Métrico',
@@ -336,6 +343,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
       map_height: LIMITS.map_height.def,
       cluster_radius: LIMITS.cluster_radius.def,
       min_points: LIMITS.min_points.def,
+      min_time: LIMITS.min_time.def,
       theme: 'system',
     };
   }
@@ -355,6 +363,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     this._config.map_height     = this._clampNum(this._config.map_height,     LIMITS.map_height);
     this._config.cluster_radius = this._clampNum(this._config.cluster_radius,  LIMITS.cluster_radius);
     this._config.min_points     = this._clampNum(this._config.min_points,      LIMITS.min_points);
+    this._config.min_time       = this._clampNum(this._config.min_time,        LIMITS.min_time);
     if (this._config.arrow_count != null) {
       this._config.arrow_count  = this._clampNum(this._config.arrow_count,     LIMITS.arrow_count);
     }
@@ -979,7 +988,7 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     this._ensureTileLayer(L);
     this._trackLayer.clearLayers();
 
-    const displayed = this._clusterPoints(points, this._radiusMeters(), this._config.min_points);
+    const displayed = this._clusterPoints(points, this._radiusMeters(), this._config.min_points, this._config.min_time);
     this._numberStops(displayed);
     const latlngs   = displayed.map(p => [p.lat, p.lng]);
     // Stops (clusters) are anchors the smoothed line must pass through, so it
@@ -1304,9 +1313,10 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     m.addTo(this._stopLayer);
   }
 
-  _clusterPoints(points, radiusMeters, minPoints = 3) {
+  _clusterPoints(points, radiusMeters, minPoints = 3, minMinutes = 0) {
     if (!radiusMeters || points.length === 0) return points.map(p => ({ ...p, count: 1 }));
     const minPts = Math.max(2, minPoints || 3);
+    const minSpanMs = Math.max(0, minMinutes || 0) * 60000;
 
     // Sequential clustering: a cluster is a run of CONSECUTIVE points that
     // stay within radiusMeters of the running centroid. Leaving the radius
@@ -1338,12 +1348,15 @@ class LovelaceTrackHistoryCard extends HTMLElement {
     }
     groups.push(group);
 
-    // Groups with at least minPts points become a cluster (one centroid
-    // entry). Smaller groups are treated as in-transit and kept as their
-    // individual points so the polyline still reflects the actual route.
+    // A group becomes a cluster (one centroid entry) only when it meets BOTH
+    // conditions: at least minPts points AND it spans at least minSpanMs of
+    // time (first → last point). Groups failing either test are treated as
+    // in-transit and kept as their individual points so the polyline still
+    // reflects the actual route.
     const result = [];
     for (const g of groups) {
-      if (g.length >= minPts) {
+      const spanMs = g[g.length - 1].time - g[0].time;
+      if (g.length >= minPts && spanMs >= minSpanMs) {
         result.push({
           lat: g.reduce((s, p) => s + p.lat, 0) / g.length,
           lng: g.reduce((s, p) => s + p.lng, 0) / g.length,
@@ -1869,6 +1882,7 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     const defaultValue  = this._config.default_entity || '';
     const clusterRadius = this._config.cluster_radius ?? LIMITS.cluster_radius.def;
     const minPoints     = this._config.min_points ?? LIMITS.min_points.def;
+    const minTime       = this._config.min_time ?? LIMITS.min_time.def;
     const themeValue    = this._config.theme || 'system';
     const showTimeline  = !!this._config.show_timeline;
     const showArrows    = this._config.show_arrows !== false;
@@ -2090,6 +2104,12 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
           </div>
 
           <div>
+            <div class="section-label">${this._t('min_time_lbl')} ${range('min_time')}</div>
+            <input type="number" id="f-min-time" class="text-input" style="margin-top:0"
+              value="${minTime}" min="${LIMITS.min_time.min}" max="${LIMITS.min_time.max}">
+          </div>
+
+          <div>
             <label class="check-label">
               <input type="checkbox" id="geo-check" ${reverseGeo ? 'checked' : ''}>
               <span>${this._t('reverse_geocode_lbl')}</span>
@@ -2166,6 +2186,11 @@ class LovelaceTrackHistoryCardEditor extends HTMLElement {
     this.shadowRoot.getElementById('f-min-points')
       .addEventListener('change', e => {
         this._set('min_points', this._clampInt(e.target, LIMITS.min_points));
+      });
+
+    this.shadowRoot.getElementById('f-min-time')
+      .addEventListener('change', e => {
+        this._set('min_time', this._clampInt(e.target, LIMITS.min_time));
       });
 
     this.shadowRoot.getElementById('geo-check')

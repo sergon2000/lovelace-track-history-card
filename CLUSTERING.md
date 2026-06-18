@@ -16,7 +16,7 @@ _fetchPoints ──▶ _clusterPoints ──▶ _numberStops ──▶ _drawTrac
    selected local day via the `history/stream` WebSocket subscription (the same
    API the HA History panel uses). Returns an ordered list of points
    `{ lat, lng, accuracy, time, state }`, sorted by time.
-2. **`_clusterPoints(points, cluster_radius, min_points)`** — collapses the raw
+2. **`_clusterPoints(points, cluster_radius, min_points, min_time)`** — collapses the raw
    points into an ordered list of **stops** (clusters) and **in-transit** points.
 3. **`_numberStops(displayed)`** — tags each cluster with a role
    (`start` / `end` / `mid`) and a 1-based number for the mid stops.
@@ -33,6 +33,7 @@ The result of `_clusterPoints` is referred to as `displayed` throughout.
 |------------------|---------|-------------------------------------------------------------------------|
 | `cluster_radius` | `200` m | Points within this distance of a cluster's running centroid join it.    |
 | `min_points`     | `3`     | A group needs at least this many points to count as a cluster (a stop). |
+| `min_time`       | `5` min | A group must also span at least this many minutes (first → last point) to count as a cluster. Both conditions must hold. Range `1`–`30`. |
 
 ## Clustering algorithm (`_clusterPoints`)
 
@@ -58,14 +59,17 @@ stops, each with its own time range — they are not merged.
 
 After grouping, each group becomes one of:
 
-- **Cluster (a stop)** — `group.length >= min_points`. Collapsed to a single
-  entry at the group's centroid, carrying:
+- **Cluster (a stop)** — meets **both** conditions: `group.length >= min_points`
+  **and** the group spans at least `min_time` minutes (last point time − first
+  point time). Collapsed to a single entry at the group's centroid, carrying:
   - `count` — number of points in the group,
   - `time` — timestamp of the **first** point (arrival),
   - `timeTo` — timestamp of the **last** point (departure).
-- **In-transit** — `group.length < min_points`. Kept as its individual points
-  (each `count: 1`). These are **not** marked on the map; only the polyline
-  passes through them, representing the device moving through.
+- **In-transit** — fails either condition (too few points **or** too brief).
+  Kept as its individual points (each `count: 1`). These are **not** marked on
+  the map; only the polyline passes through them, representing the device moving
+  through. So a quick drive-through that piles up enough points but lasts only
+  seconds is in-transit, not a stop.
 
 ### Single-outlier handling
 
