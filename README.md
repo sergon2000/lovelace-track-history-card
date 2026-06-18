@@ -90,6 +90,7 @@ map_height: 450
 units: metric
 cluster_radius: 200
 min_points: 3
+min_time: 10
 reverse_geocode: false
 ```
 
@@ -108,6 +109,7 @@ reverse_geocode: false
 | `units` | `string` | `metric` | Unit system for distances: `metric` (m / km) or `imperial` (ft / mi). Also sets the unit of `cluster_radius`. |
 | `cluster_radius` | `number` | `200` | Radius for grouping nearby points into stop clusters, in the configured `units` (meters when `metric`, feet when `imperial`); range `50`–`500`. Points outside any cluster are treated as in-transit and are not marked individually. |
 | `min_points` | `number` | `3` | Minimum number of consecutive points within the radius required to form a cluster (`2`–`5`). Runs shorter than this are treated as in-transit. |
+| `min_time` | `number` | `10` | Minimum time span a cluster must cover, in minutes — the gap between its first and last point must be at least this (`1`–`30`). Combined with `min_points`: **both** conditions must hold for a stop to count. Brief pauses are treated as in-transit. |
 | `reverse_geocode` | `boolean` | `false` | Look up an address (street and city, e.g. `Main St, Madrid`) for stops that fall outside every Home Assistant zone. **Off by default** — see [Reverse geocoding](#reverse-geocoding). |
 | `geocode_url` | `string` | Nominatim | Reverse-geocoding endpoint. Defaults to the public [Nominatim](https://nominatim.org/) service; may point at any Nominatim-compatible reverse endpoint (e.g. [LocationIQ](https://locationiq.com/) or a self-hosted instance). Only used when `reverse_geocode` is `true`. |
 

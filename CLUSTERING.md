@@ -16,7 +16,7 @@ _fetchPoints ──▶ _clusterPoints ──▶ _numberStops ──▶ _drawTrac
    selected local day via the `history/stream` WebSocket subscription (the same
    API the HA History panel uses). Returns an ordered list of points
    `{ lat, lng, accuracy, time, state }`, sorted by time.
-2. **`_clusterPoints(points, cluster_radius, min_points)`** — collapses the raw
+2. **`_clusterPoints(points, cluster_radius, min_points, min_time)`** — collapses the raw
    points into an ordered list of **stops** (clusters) and **in-transit** points.
 3. **`_numberStops(displayed)`** — tags each cluster with a role
    (`start` / `end` / `mid`) and a 1-based number for the mid stops.
@@ -33,6 +33,7 @@ The result of `_clusterPoints` is referred to as `displayed` throughout.
 |------------------|---------|-------------------------------------------------------------------------|
 | `cluster_radius` | `200` m | Points within this distance of a cluster's running centroid join it.    |
 | `min_points`     | `3`     | A group needs at least this many points to count as a cluster (a stop). |
+| `min_time`       | `10` min| A group must also span at least this many minutes (first → last point) to count as a cluster. Both conditions must hold. Range `1`–`30`. |
 
 ## Clustering algorithm (`_clusterPoints`)
 
@@ -58,14 +59,17 @@ stops, each with its own time range — they are not merged.
 
 After grouping, each group becomes one of:
 
-- **Cluster (a stop)** — `group.length >= min_points`. Collapsed to a single
-  entry at the group's centroid, carrying:
+- **Cluster (a stop)** — meets **both** conditions: `group.length >= min_points`
+  **and** the group spans at least `min_time` minutes (last point time − first
+  point time). Collapsed to a single entry at the group's centroid, carrying:
   - `count` — number of points in the group,
   - `time` — timestamp of the **first** point (arrival),
   - `timeTo` — timestamp of the **last** point (departure).
-- **In-transit** — `group.length < min_points`. Kept as its individual points
-  (each `count: 1`). These are **not** marked on the map; only the polyline
-  passes through them, representing the device moving through.
+- **In-transit** — fails either condition (too few points **or** too brief).
+  Kept as its individual points (each `count: 1`). These are **not** marked on
+  the map; only the polyline passes through them, representing the device moving
+  through. So a quick drive-through that piles up enough points but lasts only
+  seconds is in-transit, not a stop.
 
 ### Single-outlier handling
 
@@ -117,6 +121,43 @@ timeline, so the two always match. The start/end clusters are shown by colour
   points, and both ends of the polyline are snapped to that midpoint so the line
   meets the marker exactly (otherwise it stops short, visible when zoomed in).
 - **In-transit points** — not marked.
+
+### Overlap merging by zoom (`_renderStops`)
+
+Stop markers are drawn into their own layer (`_stopLayer`, separate from the
+polyline/arrows) and **re-grouped on every zoom change** (`zoomend`). Two markers
+whose centres are within `MARKER_OVERLAP_PX` (28 px) of each other at the current
+zoom would visually overlap, so they're merged into a single combined marker
+(single-linkage grouping, so a chain of close markers collapses together). Zooming
+in spreads them out and they split apart again.
+
+A combined marker:
+
+- is placed at the **centroid** of the stops it represents;
+- is **coloured** by the roles involved — green if the start is in the group, red
+  if the end is, half-green/half-red if both, orange otherwise;
+- shows a **"multiple" glyph** (overlapping squares, `MERGED_MARKER_SVG`) to mark
+  it as standing for several stops rather than a single one;
+- **clicking it zooms in** on the stops it covers, by just enough to break the
+  group apart — not straight to max zoom. The target is the **lowest zoom above
+  the current one at which the group would split into more than one marker**,
+  found by re-running the grouping (`_groupNodesAtZoom`) at each level up to the
+  map's max. So the decision is "would zooming split *anything*?", not "is the
+  closest pair separable?": a group can hold one stop that peels off and another
+  that's coincident with the start/end — one click splits off the separable stop
+  and leaves the rest merged, and the user clicks that again to keep drilling.
+  **Exception:** if *no* level splits the group even at max zoom, the stops are
+  virtually coincident and zooming would do nothing, so clicking instead opens a
+  small popup (`_mergedPopup`) listing the stops with their times — decided up
+  front (by re-grouping at max zoom) so it happens on the **first** click rather
+  than after walking the zoom to its limit. Grouping is done by projecting the
+  stops at an explicit zoom (`map.project(latlng, z)`), so a level can be probed
+  without moving the map and a tight pair is never lost to pixel rounding.
+
+The pre-existing combined start/end marker (start and end within `cluster_radius`,
+`sameZone`) is just the special case where the group is exactly {start, end} with
+no mid stops: it keeps the midpoint position and shared popup so it still meets the
+snapped polyline ends, and that pair is forced to stay merged at every zoom.
 
 ### Start/end times
 
