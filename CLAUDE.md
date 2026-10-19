@@ -86,6 +86,13 @@ shadowRoot (`_injectLeafletCss`).
   panes/controls don't render above the HA header when scrolling. Do NOT flatten
   the individual pane z-indexes — that breaks Leaflet's internal layer order.
 
+### OpenStreetMap tile requests
+- Use the canonical `https://tile.openstreetmap.org/{z}/{x}/{y}.png` endpoint.
+- Set the light tile layer's `referrerPolicy` to `strict-origin-when-cross-origin`:
+  Home Assistant can use a `same-origin` page policy, which otherwise omits the
+  Referer on external tile requests and can cause OSM to return HTTP 403 tiles.
+  This sends only the Home Assistant origin across origins, not its full path.
+
 ### Visual editor
 - **`ha-textfield` does not initialize reliably** when injected via `innerHTML`
   into the editor's Shadow DOM — use native `<input>` elements instead.

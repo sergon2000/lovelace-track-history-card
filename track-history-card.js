@@ -952,7 +952,9 @@ class LovelaceTrackHistoryCard extends HTMLElement {
           maxZoom: 19,
           keepBuffer: 6,
         })
-      : L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      : L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          // OSM requires a Referer even when Home Assistant uses same-origin policy.
+          referrerPolicy: 'strict-origin-when-cross-origin',
           attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
           maxZoom: 19,
           keepBuffer: 6,
